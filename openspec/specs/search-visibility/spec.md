@@ -45,7 +45,7 @@ The served `index.html` SHALL contain, inside the app's root element, static Eng
 
 #### Scenario: Content without JavaScript
 - **WHEN** the page is loaded with JavaScript disabled
-- **THEN** the headline "Free and open-source time tracking", the highlights including "Switch from Clockify", the setup steps, and a link to the source code are visible
+- **THEN** the headline "Free time tracking. Your data stays yours.", the highlights including "Switch from Clockify", the setup steps, and a link to the source code are visible
 
 #### Scenario: App replaces fallback
 - **WHEN** the page is loaded with JavaScript enabled
