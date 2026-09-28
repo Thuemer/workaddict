@@ -1,8 +1,10 @@
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Spinner } from '../components/bits'
 import { useAuth } from '../features/auth/AuthContext'
+import { FixPage } from '../features/auth/FixPage'
 import { LoginPage } from '../features/auth/LoginPage'
 import { TokenHelpPage } from '../features/auth/TokenHelpPage'
+import { ApprovePage } from '../features/onboarding/ApprovePage'
 import { JoinPage } from '../features/onboarding/JoinPage'
 import { SetupPage } from '../features/onboarding/SetupPage'
 import { TrackerPage } from '../features/tracker/TrackerPage'
@@ -29,10 +31,14 @@ export function App() {
           <Route path="setup" element={<SetupPage />} />
           <Route path="join" element={<JoinPage />} />
           <Route path="token-help" element={<TokenHelpPage />} />
+          <Route path="fix" element={<FixPage />} />
+          <Route path="approve" element={<ApprovePage />} />
           <Route path="*" element={<LoginPage />} />
         </Routes>
       ) : (
         <Routes>
+          {/* Owners open the link from a member while signed in; the page has no app chrome. */}
+          <Route path="approve" element={<ApprovePage />} />
           <Route
             element={
               <ZoneScope>

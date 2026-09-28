@@ -177,55 +177,13 @@ const de: Resources = {
         'Auf „Generate token“ klicken und das Token kopieren (es beginnt mit github_pat_). GitHub zeigt es nur einmal.',
       open: 'Token-Formular öffnen',
     },
-    diagnosis: {
-      ownerNotFound:
-        'Prüfe die Schreibweise. Am einfachsten: Repository auf GitHub öffnen und owner/name aus der Adresszeile kopieren.',
-      likelyCauses: 'Wahrscheinlichste Ursachen, in dieser Reihenfolge:',
-      approval:
-        'Dein Token wartet auf Freigabe. Organisationen verlangen das standardmäßig. Ein Owner von {{org}} gibt es unter Pending requests frei.',
-      approvalLink: 'Pending requests (für Owner)',
-      invitation: 'Du hast die Einladung zu {{org}} noch nicht angenommen.',
-      invitationLink: 'Einladung öffnen',
-      repoOpen:
-        'Du hast noch keinen Zugriff auf das Repository. Öffne es im Browser: Zeigt GitHub eine 404-Seite, muss ein Owner dir Zugriff geben.',
-      repoOpenLink: '{{repo}} öffnen',
-      resourceOwner:
-        'Das Token hat den falschen Resource owner oder das Repository ist nicht ausgewählt. Resource owner muss {{org}} sein, und unter Repository access muss {{repo}} ausgewählt sein.',
-      tokensLink: 'Deine Tokens',
-      createdBefore:
-        'Du hast das Token erstellt, bevor du Zugriff hattest. So ein Token sieht das Repository nie. Lösche es und erstelle ein neues.',
-      newTokenLink: 'Neues Token erstellen',
-      repoName:
-        'Der Repository-Name ist falsch geschrieben. Vergleiche ihn mit der Adresszeile auf GitHub.',
-      classicScope: 'Ein klassisches Token braucht den Scope „repo“.',
-      ownRepo:
-        'Prüfe den Repository-Namen und ob das Token darauf zugreifen darf (Repository access → Only select repositories → {{repo}}).',
-      personalFineGrained:
-        'Fine-grained Tokens können nur auf Repositories deines eigenen Kontos oder von Organisationen zugreifen, in denen du Mitglied bist. Bitte {{owner}}, das Repository in eine kostenlose GitHub-Organisation zu verschieben, oder verwende ein klassisches Token mit dem Scope „repo“ (es hat Zugriff auf alle deine Repositories).',
-      classicLink: 'Klassisches Token erstellen',
-      personalInvite:
-        'Nimm die Einladung zum Repository an. Gibt es keine, muss {{owner}} dich als Collaborator mit Write-Zugriff hinzufügen.',
-      readOnlyToken:
-        'Dein Token hat nur Contents: Read-only. Erstelle ein neues Token mit Contents: Read and write.',
-      readOnlyRole: 'Oder deine Rolle im Repository ist Read. Ein Owner muss dir Write geben.',
-      askOwner: 'Muss ein Owner etwas tun? Dann schick diese Nachricht:',
-      copyOwnerMessage: 'Nachricht an den Owner kopieren',
-    },
     ownerMsg: {
       greeting: 'Hallo,',
       noAccess:
-        'ich möchte mich bei unserer Zeiterfassung (Workaddict) anmelden, habe aber keinen Zugriff auf das Repository {{repo}}.',
-      readOnly:
-        'ich möchte mich bei unserer Zeiterfassung (Workaddict) anmelden, kann das Repository {{repo}} aber nur lesen, nicht schreiben.',
+        'ich kann mich bei unserer Zeiterfassung (Workaddict) mit dem Repository {{repo}} nicht anmelden.',
       login: 'Mein GitHub-Benutzername: {{login}}',
-      pleaseCheck: 'Kannst du bitte Folgendes prüfen?',
-      checkMember: 'Ich bin Mitglied der Organisation {{org}} (People: {{link}})',
-      checkWrite: 'Ich habe Write-Zugriff auf {{repo}} (Collaborators and teams: {{link}})',
-      checkApproval:
-        'Mein Token ist freigegeben, falls die Organisation eine Freigabe verlangt (Pending requests: {{link}})',
-      checkCollaborator: 'Ich bin Collaborator mit Write-Zugriff auf {{repo}} ({{link}})',
-      elseResourceOwner:
-        'Falls das alles schon passt, liegt es wahrscheinlich an meinem Token: Es funktioniert nur, wenn es mit {{org}} als Resource owner erstellt wurde, nicht mit meinem eigenen Konto. Sag einfach Bescheid, dann erstelle ich ein neues.',
+      openPage:
+        'Diese Seite zeigt, was du auf GitHub prüfen musst, mit einem Button pro Schritt: {{link}}',
       thanks: 'Danke!',
     },
     inviteMsg: {
@@ -355,6 +313,89 @@ const de: Resources = {
         'Lade die Person unter People mit der Rolle Member ein oder verwende die GitHub CLI.',
       pendingText:
         'Verlangt deine Organisation eine Token-Freigabe, gibst du neue Tokens hier frei:',
+    },
+  },
+  fix: {
+    title: 'Anmeldung hat nicht geklappt',
+    intro: 'Prüfe diese Punkte der Reihe nach und versuche es dann erneut.',
+    back: 'Zurück zur Anmeldung',
+    retry: 'Erneut versuchen',
+    change: 'Token oder Repository ändern',
+    checkedAgain: 'Um {{time}} erneut geprüft. Es klappt noch nicht.',
+    ownerTitle: 'Klappt es immer noch nicht? Dann muss ein Owner etwas tun',
+    ownerText:
+      'Manches kann nur ein Owner von {{owner}} erledigen, zum Beispiel dein Token freigeben oder dir Zugriff geben. Schick ihm diese Nachricht. Sie verlinkt eine Seite, die genau zeigt, was zu klicken ist.',
+    copyOwner: 'Nachricht an den Owner kopieren',
+    steps: {
+      repoFormat:
+        'Öffne das Repository auf GitHub und kopiere owner/name aus der Adresszeile: Aus github.com/my-team/time-data wird my-team/time-data.',
+      invalidToken:
+        'Das Token wurde nicht vollständig kopiert, ist abgelaufen oder wurde gelöscht. Erstelle ein neues:',
+      invitation: 'Nimm die Einladung zu {{org}} an.',
+      invitationLink: 'Einladung öffnen',
+      repoOpen:
+        'Öffne das Repository. Zeigt GitHub eine 404-Seite, hast du noch keinen Zugriff und ein Owner muss dich hinzufügen.',
+      repoOpenLink: '{{repo}} öffnen',
+      resourceOwner:
+        'Prüfe dein Token: Resource owner muss {{org}} sein, und unter Repository access muss {{repo}} ausgewählt sein. Ein Token, das du erstellt hast, bevor du Zugriff hattest, funktioniert nie: Lösche es und erstelle ein neues.',
+      resourceOwnerGeneric:
+        'Prüfe dein Token: Resource owner muss die Organisation sein, der das Repository gehört, und unter Repository access muss das Repository ausgewählt sein. Ein Token, das du erstellt hast, bevor du Zugriff hattest, funktioniert nie: Lösche es und erstelle ein neues.',
+      tokensLink: 'Deine Tokens',
+      newTokenLink: 'Neues Token erstellen',
+      classicScope:
+        'Ein klassisches Token braucht den Scope „repo“. Erstelle eines, bei dem der Scope schon ausgewählt ist.',
+      classicLink: 'Klassisches Token erstellen',
+      ownRepo:
+        'Prüfe den Repository-Namen und ob das Token darauf zugreifen darf (Repository access → Only select repositories → {{repo}}).',
+      personalFineGrained:
+        'Fine-grained Tokens können nur auf Repositories deines eigenen Kontos oder von Organisationen zugreifen, in denen du Mitglied bist. Bitte {{owner}}, das Repository in eine kostenlose GitHub-Organisation zu verschieben, oder verwende ein klassisches Token mit dem Scope „repo“ (es hat Zugriff auf alle deine Repositories).',
+      personalInvite:
+        'Nimm die Einladung zum Repository an. Gibt es keine, muss {{owner}} dich als Collaborator hinzufügen.',
+      readOnlyToken:
+        'Dein Token hat nur Contents: Read-only. Erstelle ein neues Token mit Contents: Read and write.',
+      offline: 'Prüfe deine Internetverbindung und versuche es dann erneut.',
+      rateLimit:
+        'GitHub erlaubt nur eine begrenzte Zahl von Anfragen pro Stunde. Warte bis {{time}} und versuche es dann erneut.',
+      unknown:
+        'Warte kurz und versuche es erneut. Passiert das öfter, hat GitHub vielleicht ein Problem (githubstatus.com).',
+    },
+  },
+  approve: {
+    title: '{{member}} kann sich nicht bei eurer Zeiterfassung anmelden',
+    titleNeutral: 'Ein Mitglied kann sich nicht bei eurer Zeiterfassung anmelden',
+    intro:
+      'Daten-Repository {{repo}}. Melde dich auf GitHub als Owner von {{org}} an und geh diese Schritte durch.',
+    introUser:
+      'Daten-Repository {{repo}}. Melde dich auf GitHub als {{org}} an und füge das Mitglied hinzu.',
+    back: 'Workaddict öffnen',
+    broken: 'Dieser Link ist fehlerhaft. Bitte das Mitglied, die Nachricht erneut zu kopieren.',
+    pendingTitle: 'Token freigeben',
+    pendingText:
+      'Organisationen verlangen standardmäßig, dass Owner neue Tokens freigeben. Öffne die offenen Anfragen, wähle die Anfrage des Mitglieds und klicke auf Approve.',
+    pendingLink: 'Offene Anfragen öffnen',
+    emptyHint:
+      'Die Liste ist leer oder das Mitglied fehlt darin? Dann ist die Freigabe ausgeschaltet, oder das Token wurde für das eigene Konto des Mitglieds erstellt statt für {{org}}. Dann muss das Mitglied ein neues Token erstellen. Schick ihm diese Notiz:',
+    copyNote: 'Notiz für {{member}} kopieren',
+    copyNoteNeutral: 'Notiz für das Mitglied kopieren',
+    peopleTitle: 'Mitgliedschaft prüfen',
+    peopleText:
+      'Das Mitglied muss zu {{org}} gehören. Ist die Einladung noch offen, muss es sie zuerst annehmen.',
+    peopleLink: 'People öffnen',
+    accessTitle: 'Write-Zugriff prüfen',
+    accessText:
+      'Das Mitglied braucht Write-Zugriff auf {{repo}}: direkt, über ein Team oder über die Basisberechtigung der Organisation.',
+    accessLink: 'Collaborators and teams öffnen',
+    collaboratorTitle: 'Mitglied als Collaborator hinzufügen',
+    collaboratorText:
+      'Klicke auf „Add people“ und gib den GitHub-Benutzernamen des Mitglieds ein. Collaborators eines persönlichen Repositorys dürfen schreiben. Danach nimmt das Mitglied die Einladung an.',
+    tipTitle: 'Keine Lust, jedes Token freizugeben?',
+    tipText:
+      'Schalte die Freigabe aus: Wähle „Do not require administrator approval“ und klicke auf Save. Mitglieder können sich dann direkt nach dem Erstellen des Tokens anmelden.',
+    tipLink: 'Token-Richtlinie öffnen',
+    note: {
+      greeting: 'Hallo,',
+      text: 'dein Token taucht bei den offenen Anfragen von {{org}} nicht auf. Wahrscheinlich wurde es für dein eigenes Konto erstellt. Bitte erstelle ein neues Token und wähle {{org}} als Resource owner.',
+      link: 'Diese Seite erklärt jedes Feld: {{link}}',
     },
   },
   footer: {

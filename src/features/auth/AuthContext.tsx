@@ -18,6 +18,7 @@ import {
   saveSession,
   type Session,
 } from './session'
+import { signInAttempt } from './signInAttempt'
 
 export type LogoutReason = 'sessionExpired' | 'unreachable'
 
@@ -64,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(
     async (reason?: 'sessionExpired') => {
       clearSession()
+      signInAttempt.clear()
       queryClient.clear()
       await clearBlobCache()
       setState({ status: 'loggedOut', reason })

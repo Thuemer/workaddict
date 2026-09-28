@@ -375,7 +375,7 @@ export function SetupPage() {
 
               <Step n={steps.length + 1} title={t('onboarding.setup.signInTitle')} locked={locked}>
                 <p>{t('onboarding.setup.signInText')}</p>
-                <SignInForm key={`${org}/${repo}`} initialRepo={`${org}/${repo}`} />
+                <SignInForm key={`${org}/${repo}`} from="setup" initialRepo={`${org}/${repo}`} />
                 {solo && <p className="muted small">{t('onboarding.setup.soloLater')}</p>}
               </Step>
             </ol>

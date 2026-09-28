@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../../i18n'
-import { ghCommands, githubLinks, inviteLink } from './githubLinks'
-import { inviteMessage, ownerMessage } from './messages'
+import { ghCommands, githubLinks, inviteLink, ownerPageLink } from './githubLinks'
+import { inviteMessage, memberNote, ownerMessage } from './messages'
 import { isLogin, isRepoName, joinTarget, parseUsernames } from './names'
 import { emptySetup, loadSetup, saveSetup, SETUP_STEPS, stepsFor } from './setupState'
 
@@ -125,80 +125,44 @@ describe('ghCommands', () => {
 })
 
 describe('ownerMessage', () => {
-  const base = { owner: 'my-team', repo: 'time-data', memberLogin: 'anna' } as const
+  const link = ownerPageLink('my-team', 'time-data', { member: 'anna' }, 'https://workaddict.me/')
 
-  it('lists membership, write access and approval for an organization repo', () => {
-    const text = ownerMessage(t, {
-      ...base,
-      ownerType: 'Organization',
-      problem: 'noAccess',
-      fineGrained: true,
-    })
-    expect(text).toContain('cannot access the repository my-team/time-data')
+  it('is short, names member and repository, and links the owner page', () => {
+    const text = ownerMessage(t, { owner: 'my-team', repo: 'time-data', memberLogin: 'anna', link })
+    expect(text).toContain('my-team/time-data')
     expect(text).toContain('My GitHub username: anna')
-    expect(text).toContain('https://github.com/orgs/my-team/people')
-    expect(text).toContain('https://github.com/my-team/time-data/settings/access')
-    expect(text).toContain(
-      'https://github.com/organizations/my-team/settings/personal-access-token-requests',
-    )
-    // A token made for the member's own account gives the same 404 as a missing invitation, so
-    // the message has to name that case; otherwise the owner checks three correct things and the
-    // member is still locked out.
-    expect(text).toContain('my-team as its resource owner')
+    expect(text).toContain('https://workaddict.me/#/approve?org=my-team&repo=time-data&member=anna')
+    expect(text).not.toContain('github_pat_')
+    expect(text.split('\n').length).toBeLessThanOrEqual(8)
   })
 
-  it('leaves out the resource-owner hint where it cannot apply', () => {
-    const classic = ownerMessage(t, {
-      ...base,
-      ownerType: 'Organization',
-      problem: 'noAccess',
-      fineGrained: false,
-    })
-    expect(classic).not.toContain('resource owner')
-
-    const readOnly = ownerMessage(t, {
-      ...base,
-      ownerType: 'Organization',
-      problem: 'readOnly',
-      fineGrained: true,
-    })
-    expect(readOnly).not.toContain('resource owner')
-  })
-
-  it('leaves out approval for classic tokens and unknown members', () => {
-    const text = ownerMessage(t, {
-      owner: 'my-team',
-      repo: 'time-data',
-      ownerType: 'Organization',
-      problem: 'noAccess',
-      fineGrained: false,
-    })
-    expect(text).not.toContain('personal-access-token-requests')
+  it('leaves out the username when it is not known', () => {
+    const text = ownerMessage(t, { owner: 'my-team', repo: 'time-data', link })
     expect(text).not.toContain('username')
   })
 
-  it('asks for write access when the member can only read', () => {
-    const text = ownerMessage(t, {
-      ...base,
-      ownerType: 'Organization',
-      problem: 'readOnly',
-      fineGrained: true,
-    })
-    expect(text).toContain('can only read the repository my-team/time-data')
-    expect(text).toContain('Write access')
-    expect(text).not.toContain('personal-access-token-requests')
+  it('is translated', () => {
+    const de = i18n.getFixedT('de')
+    expect(ownerMessage(de, { owner: 'my-team', repo: 'time-data', link })).toContain('Hallo')
   })
+})
 
-  it('asks for a collaborator invitation for a personal repo', () => {
-    const text = ownerMessage(t, {
-      ...base,
-      owner: 'ben',
-      ownerType: 'User',
-      problem: 'noAccess',
-      fineGrained: false,
-    })
-    expect(text).toContain('collaborator with Write access to ben/time-data')
-    expect(text).not.toContain('/orgs/')
+describe('memberNote', () => {
+  it('asks for a new token with the organization as resource owner', () => {
+    const text = memberNote(t, { org: 'my-team', link: 'https://workaddict.me/#/token-help' })
+    expect(text).toContain('choose my-team as the resource owner')
+    expect(text).toContain('https://workaddict.me/#/token-help')
+  })
+})
+
+describe('ownerPageLink', () => {
+  it('builds the owner page from the current page', () => {
+    expect(ownerPageLink('my-team', 'time-data', {}, 'https://x.github.io/app/#/fix?e=x')).toBe(
+      'https://x.github.io/app/#/approve?org=my-team&repo=time-data',
+    )
+    expect(
+      ownerPageLink('ben', 'time-data', { member: 'anna', kind: 'user' }, 'https://workaddict.me/'),
+    ).toBe('https://workaddict.me/#/approve?org=ben&repo=time-data&member=anna&kind=user')
   })
 })
 

@@ -1490,14 +1490,32 @@ a.btn {
   margin-top: -10px;
   font-size: 0.85rem;
 }
-.ob-diagnosis {
+/* Sign-in fix page: one card per step, the button right under its text. */
+.fix-eyebrow {
+  color: var(--danger);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.fix-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 18px;
+}
+.fix-step-body {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  color: var(--text);
+  gap: 10px;
 }
-.ob-diagnosis > strong {
-  color: var(--danger);
+.fix-step .gh-link a.btn {
+  padding: 8px 14px;
+  font-size: 0.95rem;
+}
+.fix-actions {
+  flex-wrap: wrap;
+  gap: 10px;
 }
 .settings-row.ob-team {
   align-items: stretch;
@@ -1530,7 +1548,8 @@ a.btn {
   .ob-modes {
     grid-template-columns: minmax(0, 1fr);
   }
-  .ob-step {
+  .ob-step,
+  .fix-step {
     padding: 14px;
   }
   .ob-step-head {

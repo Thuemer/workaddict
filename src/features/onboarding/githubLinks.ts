@@ -42,10 +42,30 @@ export const githubLinks = {
   classicToken: () => `${GH}/settings/tokens/new?scopes=repo&description=Workaddict`,
 }
 
+/** A link to a page of this app (hash route), based on the current page URL. */
+export function appLink(path: string, href = window.location.href): string {
+  return `${href.split('#')[0]!}#${path}`
+}
+
 /** The app's invite link for a data repository, based on the current page URL. */
 export function inviteLink(owner: string, repo: string, href = window.location.href): string {
-  const base = href.split('#')[0]!
-  return `${base}#/join?repo=${seg(owner)}/${seg(repo)}`
+  return appLink(`/join?repo=${seg(owner)}/${seg(repo)}`, href)
+}
+
+/**
+ * The owner page a member sends to the repository owner when they can't sign in. `kind: 'user'`
+ * marks a repository in a personal account, which has collaborators instead of org members.
+ */
+export function ownerPageLink(
+  owner: string,
+  repo: string,
+  opts: { member?: string; kind?: 'user' } = {},
+  href = window.location.href,
+): string {
+  const params = [`org=${seg(owner)}`, `repo=${seg(repo)}`]
+  if (opts.member) params.push(`member=${seg(opts.member)}`)
+  if (opts.kind) params.push(`kind=${opts.kind}`)
+  return appLink(`/approve?${params.join('&')}`, href)
 }
 
 /**

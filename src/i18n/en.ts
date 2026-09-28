@@ -167,54 +167,11 @@ const en = {
         'Click “Generate token” and copy the token (it starts with github_pat_). GitHub shows it only once.',
       open: 'Open the token form',
     },
-    diagnosis: {
-      ownerNotFound:
-        'Check the spelling. The easiest way: open the repository on GitHub and copy owner/name from the address bar.',
-      likelyCauses: 'Most likely causes, in this order:',
-      approval:
-        'Your token is waiting for approval. Organizations require this by default. An owner of {{org}} approves it under Pending requests.',
-      approvalLink: 'Pending requests (for owners)',
-      invitation: 'You have not accepted the invitation to {{org}} yet.',
-      invitationLink: 'Open the invitation',
-      repoOpen:
-        'You have no access to the repository yet. Open it in the browser: if GitHub shows a 404 page, an owner has to give you access.',
-      repoOpenLink: 'Open {{repo}}',
-      resourceOwner:
-        'The token has the wrong resource owner, or the repository is not selected. The resource owner must be {{org}}, and {{repo}} must be selected under Repository access.',
-      tokensLink: 'Your tokens',
-      createdBefore:
-        'You created the token before you had access. Such a token never sees the repository: delete it and create a new one.',
-      newTokenLink: 'Create a new token',
-      repoName: 'The repository name is misspelled. Compare it with the address bar on GitHub.',
-      classicScope: 'A classic token needs the “repo” scope.',
-      ownRepo:
-        'Check the repository name, and that the token can access it (Repository access → Only select repositories → {{repo}}).',
-      personalFineGrained:
-        'Fine-grained tokens can only access repositories of your own account or of organizations you belong to. Ask {{owner}} to move the repository into a free GitHub organization, or use a classic token with the “repo” scope (it can access all of your repositories).',
-      classicLink: 'Create a classic token',
-      personalInvite:
-        'Accept the invitation to the repository. If there is none, {{owner}} has to add you as a collaborator with Write access.',
-      readOnlyToken:
-        'Your token only has Contents: Read-only. Create a new token with Contents: Read and write.',
-      readOnlyRole: 'Or your role on the repository is Read. An owner has to give you Write.',
-      askOwner: 'An owner has to act? Send them this message:',
-      copyOwnerMessage: 'Copy message for the owner',
-    },
     ownerMsg: {
       greeting: 'Hi,',
-      noAccess:
-        'I want to sign in to our time tracking (Workaddict), but I cannot access the repository {{repo}}.',
-      readOnly:
-        'I want to sign in to our time tracking (Workaddict), but I can only read the repository {{repo}}, not write to it.',
+      noAccess: 'I cannot sign in to our time tracking (Workaddict) with the repository {{repo}}.',
       login: 'My GitHub username: {{login}}',
-      pleaseCheck: 'Could you check the following?',
-      checkMember: 'I am a member of the organization {{org}} (People: {{link}})',
-      checkWrite: 'I have Write access to {{repo}} (Collaborators and teams: {{link}})',
-      checkApproval:
-        'My token is approved, if the organization requires approval (Pending requests: {{link}})',
-      checkCollaborator: 'I am a collaborator with Write access to {{repo}} ({{link}})',
-      elseResourceOwner:
-        'If all of that is already in order, then my token is probably the problem: it only works if it was created with {{org}} as its resource owner, not my own account. Just tell me, and I will create a new one.',
+      openPage: 'This page shows what to check on GitHub, with a button for each step: {{link}}',
       thanks: 'Thank you!',
     },
     inviteMsg: {
@@ -338,6 +295,88 @@ const en = {
       addTitle: 'Add a member',
       addText: 'Invite them under People with the role Member, or use the GitHub CLI.',
       pendingText: 'If your organization requires token approval, approve new tokens here:',
+    },
+  },
+  fix: {
+    title: 'Sign-in did not work',
+    intro: 'Check these one at a time, then try again.',
+    back: 'Back to sign-in',
+    retry: 'Try again',
+    change: 'Change token or repository',
+    checkedAgain: 'Checked again at {{time}}. It still does not work.',
+    ownerTitle: 'Still stuck? An owner has to act',
+    ownerText:
+      'Some things only an owner of {{owner}} can do, for example approving your token or giving you access. Send them this message. It links to a page that shows them exactly what to click.',
+    copyOwner: 'Copy message for your owner',
+    steps: {
+      repoFormat:
+        'Open the repository on GitHub and copy owner/name from the address bar: github.com/my-team/time-data becomes my-team/time-data.',
+      invalidToken:
+        'The token was not copied completely, has expired, or was deleted. Create a new one:',
+      invitation: 'Accept the invitation to {{org}}.',
+      invitationLink: 'Open the invitation',
+      repoOpen:
+        'Open the repository. If GitHub shows a 404 page, you have no access yet and an owner has to add you.',
+      repoOpenLink: 'Open {{repo}}',
+      resourceOwner:
+        'Check your token: the resource owner must be {{org}}, and {{repo}} must be selected under Repository access. A token created before you had access never works: delete it and create a new one.',
+      resourceOwnerGeneric:
+        'Check your token: the resource owner must be the organization that owns the repository, and the repository must be selected under Repository access. A token created before you had access never works: delete it and create a new one.',
+      tokensLink: 'Your tokens',
+      newTokenLink: 'Create a new token',
+      classicScope:
+        'A classic token needs the “repo” scope. Create one with the scope already selected.',
+      classicLink: 'Create a classic token',
+      ownRepo:
+        'Check the repository name, and that the token can access it (Repository access → Only select repositories → {{repo}}).',
+      personalFineGrained:
+        'Fine-grained tokens can only access repositories of your own account or of organizations you belong to. Ask {{owner}} to move the repository into a free GitHub organization, or use a classic token with the “repo” scope (it can access all of your repositories).',
+      personalInvite:
+        'Accept the invitation to the repository. If there is none, {{owner}} has to add you as a collaborator.',
+      readOnlyToken:
+        'Your token only has Contents: Read-only. Create a new token with Contents: Read and write.',
+      offline: 'Check your internet connection, then try again.',
+      rateLimit:
+        'GitHub allows only a limited number of requests per hour. Wait until {{time}}, then try again.',
+      unknown:
+        'Wait a moment and try again. If it keeps happening, GitHub may have a problem (githubstatus.com).',
+    },
+  },
+  approve: {
+    title: '{{member}} cannot sign in to your time tracking',
+    titleNeutral: 'A member cannot sign in to your time tracking',
+    intro:
+      'Data repository {{repo}}. Sign in to GitHub as an owner of {{org}}, then go through these steps.',
+    introUser: 'Data repository {{repo}}. Sign in to GitHub as {{org}}, then add the member.',
+    back: 'Open Workaddict',
+    broken: 'This link is broken. Ask the member to copy the message again.',
+    pendingTitle: 'Approve the token',
+    pendingText:
+      'Organizations require owners to approve new tokens by default. Open the pending requests, select the member’s request and click Approve.',
+    pendingLink: 'Open pending requests',
+    emptyHint:
+      'The list is empty, or the member is not in it? Then approval is turned off, or the token was created for the member’s own account instead of {{org}}. In that case the member has to create a new token. Send them this note:',
+    copyNote: 'Copy note for {{member}}',
+    copyNoteNeutral: 'Copy note for the member',
+    peopleTitle: 'Check the membership',
+    peopleText:
+      'The member must belong to {{org}}. If their invitation is still pending, they have to accept it first.',
+    peopleLink: 'Open People',
+    accessTitle: 'Check Write access',
+    accessText:
+      'The member needs Write access to {{repo}}: directly, through a team, or through the base permission of the organization.',
+    accessLink: 'Open Collaborators and teams',
+    collaboratorTitle: 'Add the member as a collaborator',
+    collaboratorText:
+      'Click “Add people” and enter the member’s GitHub username. Collaborators on a personal repository can write to it. The member then accepts the invitation.',
+    tipTitle: 'Tired of approving tokens?',
+    tipText:
+      'Turn approval off: select “Do not require administrator approval” and click Save. Members can then sign in right after creating their token.',
+    tipLink: 'Open the token policy',
+    note: {
+      greeting: 'Hi,',
+      text: 'your token does not show up in the pending requests of {{org}}. It was probably created for your own account. Please create a new token and choose {{org}} as the resource owner.',
+      link: 'This page explains every field: {{link}}',
     },
   },
   footer: {

@@ -6,8 +6,11 @@ import '../../i18n'
 import { CopyText } from '../../components/CopyText'
 import { FakeGitHub } from '../../storage/github/fakeGitHub'
 import { AuthContext } from '../auth/AuthContext'
+import { FixPage } from '../auth/FixPage'
 import { LoginPage } from '../auth/LoginPage'
+import { signInAttempt } from '../auth/signInAttempt'
 import { TokenHelpPage } from '../auth/TokenHelpPage'
+import { ApprovePage } from './ApprovePage'
 import { JoinPage } from './JoinPage'
 import { SetupPage } from './SetupPage'
 
@@ -22,6 +25,8 @@ function renderAt(path: string) {
             <Route path="setup" element={<SetupPage />} />
             <Route path="join" element={<JoinPage />} />
             <Route path="token-help" element={<TokenHelpPage />} />
+            <Route path="fix" element={<FixPage />} />
+            <Route path="approve" element={<ApprovePage />} />
             <Route path="*" element={<LoginPage />} />
           </Routes>
         </MemoryRouter>
@@ -41,6 +46,7 @@ afterEach(() => {
   Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true })
   vi.unstubAllGlobals()
   localStorage.clear()
+  signInAttempt.clear()
 })
 
 describe('CopyText', () => {
@@ -96,7 +102,7 @@ describe('start page', () => {
   })
 })
 
-describe('sign-in diagnosis', () => {
+describe('sign-in failure', () => {
   let gh: FakeGitHub
   beforeEach(() => {
     gh = new FakeGitHub('my-team', 'time-data')
@@ -111,70 +117,118 @@ describe('sign-in diagnosis', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
   }
 
-  it('puts token approval first for an organization repo and offers a message for the owner', async () => {
+  const fixHeading = (name: string | RegExp) => screen.findByRole('heading', { level: 1, name })
+
+  it('moves to the fix page with the member’s own steps and a message for the owner', async () => {
     renderAt('/')
     signIn('my-team/other')
-    const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent('Your token cannot see the repository my-team/other.')
-    const causes = within(alert).getAllByRole('listitem')
-    expect(causes[0]).toHaveTextContent(/waiting for approval/)
-    expect(within(causes[0]!).getByRole('link')).toHaveAttribute(
+    await fixHeading('Your token cannot see the repository my-team/other.')
+    expect(screen.queryByText(/Free time tracking/)).toBeNull()
+    expect(screen.queryByLabelText('GitHub token')).toBeNull()
+    expect(screen.getByRole('link', { name: /Open the invitation/ })).toHaveAttribute(
       'href',
-      'https://github.com/organizations/my-team/settings/personal-access-token-requests',
+      'https://github.com/orgs/my-team/invitation',
     )
-    expect(alert).toHaveTextContent(/created the token before you had access/)
+    expect(screen.getByRole('link', { name: /Open my-team\/other/ })).toBeInTheDocument()
+    expect(screen.getByText(/resource owner must be my-team/)).toBeInTheDocument()
+    expect(screen.queryByText(/waiting for approval/)).toBeNull()
 
     const writeText = mockClipboard()
-    fireEvent.click(within(alert).getByRole('button', { name: 'Copy message for the owner' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Copy message for your owner' }))
     await waitFor(() => expect(writeText).toHaveBeenCalled())
     const message = writeText.mock.calls[0]![0]
     expect(message).toContain('My GitHub username: anna')
-    expect(message).toContain('my-team/other')
+    expect(message).toContain('#/approve?org=my-team&repo=other&member=anna')
     expect(message).not.toContain('github_pat_anna')
   })
 
-  it('skips approval and resource owner for classic tokens', async () => {
+  it('asks for the repo scope instead of the resource owner for classic tokens', async () => {
     renderAt('/')
     signIn('my-team/other', 'ghp_anna')
-    const alert = await screen.findByRole('alert')
-    expect(alert).not.toHaveTextContent(/waiting for approval/)
-    expect(alert).toHaveTextContent(/needs the “repo” scope/)
+    await fixHeading(/cannot see the repository/)
+    expect(screen.getByText(/needs the “repo” scope/)).toBeInTheDocument()
+    expect(screen.queryByText(/resource owner must be/)).toBeNull()
   })
 
-  it('points out a misspelled owner', async () => {
+  it('points out a misspelled owner without bothering the owner', async () => {
     renderAt('/')
     signIn('my-tema/time-data')
-    const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent('There is no GitHub account or organization named “my-tema”.')
-    expect(within(alert).queryByRole('button', { name: 'Copy message for the owner' })).toBeNull()
+    await fixHeading('There is no GitHub account or organization named “my-tema”.')
+    expect(screen.getByText(/copy owner\/name from the address bar/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Copy message for your owner' })).toBeNull()
   })
 
   it('explains that fine-grained tokens cannot reach another person’s repo', async () => {
     renderAt('/')
     signIn('ben/time-data')
-    const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent(/belongs to the personal account of ben/)
-    expect(alert).toHaveTextContent(/move the repository into a free GitHub organization/)
+    await fixHeading(/belongs to the personal account of ben/)
+    expect(
+      screen.getByText(/move the repository into a free GitHub organization/),
+    ).toBeInTheDocument()
   })
 
   it('names the user’s own repo', async () => {
     renderAt('/')
     signIn('anna/time-data')
-    expect(await screen.findByRole('alert')).toHaveTextContent(/in your own account/)
+    await fixHeading(/in your own account/)
   })
 
-  it('explains both causes of read-only access', async () => {
+  it('asks for a read-and-write token and offers the owner message for read-only access', async () => {
     gh.push = false
     renderAt('/')
     signIn('my-team/time-data')
-    const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent(
-      'You can read the repository my-team/time-data, but not write to it.',
+    await fixHeading('You can read the repository my-team/time-data, but not write to it.')
+    expect(screen.getByText(/Contents: Read-only/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Copy message for your owner' })).toBeInTheDocument()
+  })
+
+  it('tries again with the token kept in memory and signs in', async () => {
+    gh.push = false
+    const { login } = renderAt('/')
+    signIn('my-team/time-data')
+    await fixHeading(/but not write to it/)
+    expect(JSON.stringify(localStorage)).not.toContain('github_pat_anna')
+    expect(JSON.stringify(sessionStorage)).not.toContain('github_pat_anna')
+
+    gh.push = true
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    await waitFor(() => expect(login).toHaveBeenCalled())
+    expect(login).toHaveBeenCalledWith(
+      expect.objectContaining({ token: 'github_pat_anna', repo: 'my-team/time-data' }),
+      true,
     )
-    expect(alert).toHaveTextContent(/Contents: Read-only/)
-    expect(alert).toHaveTextContent(/your role on the repository is Read/)
+  })
+
+  it('shows the new error when trying again fails differently', async () => {
+    gh.push = false
+    renderAt('/')
+    signIn('my-team/time-data')
+    await fixHeading(/but not write to it/)
+    gh.users = {}
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    await fixHeading(/GitHub rejected this token/)
+  })
+
+  it('goes back to the form with the entered values', async () => {
+    renderAt('/')
+    signIn('my-team/other')
+    await fixHeading(/cannot see the repository/)
+    fireEvent.click(screen.getByRole('link', { name: 'Change token or repository' }))
+    expect(await screen.findByLabelText('Data repository')).toHaveValue('my-team/other')
+    expect(screen.getByLabelText('GitHub token')).toHaveValue('github_pat_anna')
+  })
+
+  it('still shows the steps without the attempt, for example after a reload', () => {
+    renderAt('/fix?e=orgRepoNotAccessible&repo=my-team/time-data&from=start')
+    expect(screen.getByRole('link', { name: /Open the invitation/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
+    expect(screen.getAllByRole('link', { name: /Back to sign-in/ }).length).toBeGreaterThan(0)
+  })
+
+  it('shows the general steps for an unknown error code', () => {
+    renderAt('/fix?e=nonsense')
     expect(
-      within(alert).getByRole('button', { name: 'Copy message for the owner' }),
+      screen.getByRole('heading', { level: 1, name: /Something went wrong/ }),
     ).toBeInTheDocument()
   })
 
@@ -190,6 +244,63 @@ describe('sign-in diagnosis', () => {
       }),
       true,
     ])
+  })
+
+  it('moves to the fix page from the join flow and returns to its sign-in step', async () => {
+    renderAt('/join?repo=my-team/time-data')
+    fireEvent.click(screen.getByRole('button', { name: 'I can see it' }))
+    fireEvent.change(screen.getByLabelText('GitHub token'), { target: { value: 'github_pat_x' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    await fixHeading(/GitHub rejected this token/)
+    fireEvent.click(screen.getByRole('link', { name: 'Change token or repository' }))
+    expect(await screen.findByLabelText('GitHub token')).toHaveValue('github_pat_x')
+  })
+})
+
+describe('owner page', () => {
+  it('shows one button per owner action for an organization', () => {
+    renderAt('/approve?org=my-team&repo=time-data&member=anna')
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'anna cannot sign in to your time tracking' }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Open pending requests/ })).toHaveAttribute(
+      'href',
+      'https://github.com/organizations/my-team/settings/personal-access-token-requests',
+    )
+    expect(screen.getByRole('link', { name: /Open People/ })).toHaveAttribute(
+      'href',
+      'https://github.com/orgs/my-team/people',
+    )
+    expect(screen.getByRole('link', { name: /Open the token policy/ })).toBeInTheDocument()
+    expect(screen.getByText(/The list is empty/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Copy note for anna' })).toBeInTheDocument()
+  })
+
+  it('uses neutral wording without a valid member', () => {
+    renderAt('/approve?org=my-team&repo=time-data&member=a%20b')
+    expect(
+      screen.getByRole('heading', {
+        level: 1,
+        name: 'A member cannot sign in to your time tracking',
+      }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Copy note for the member' })).toBeInTheDocument()
+  })
+
+  it('only asks to add a collaborator for a personal repository', () => {
+    renderAt('/approve?org=ben&repo=time-data&member=anna&kind=user')
+    expect(screen.getByRole('link', { name: /Open Collaborators and teams/ })).toHaveAttribute(
+      'href',
+      'https://github.com/ben/time-data/settings/access',
+    )
+    expect(screen.queryByRole('link', { name: /Open pending requests/ })).toBeNull()
+  })
+
+  it('shows only a notice for a broken link', () => {
+    renderAt('/approve?org=%3Cscript%3E&repo=x')
+    expect(screen.getByRole('alert')).toHaveTextContent(/This link is broken/)
+    const links = within(screen.getByRole('main')).getAllByRole('link')
+    expect(links.filter((a) => a.getAttribute('href')?.includes('github.com'))).toEqual([])
   })
 })
 
@@ -406,9 +517,11 @@ describe('join flow', () => {
     expect(screen.queryByRole('link', { name: /Open the token form/ })).toBeNull()
 
     const writeText = mockClipboard()
-    fireEvent.click(within(alert).getByRole('button', { name: 'Copy message for the owner' }))
+    fireEvent.click(within(alert).getByRole('button', { name: 'Copy message for your owner' }))
     await waitFor(() =>
-      expect(writeText).toHaveBeenCalledWith(expect.stringContaining('my-team/time-data')),
+      expect(writeText).toHaveBeenCalledWith(
+        expect.stringContaining('#/approve?org=my-team&repo=time-data'),
+      ),
     )
 
     fireEvent.click(within(alert).getByRole('button', { name: 'Check again' }))

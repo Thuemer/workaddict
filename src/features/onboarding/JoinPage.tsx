@@ -5,8 +5,9 @@ import { SiteFooter } from '../../components/SiteFooter'
 import { useI18n } from '../../i18n'
 import { LoginPage } from '../auth/LoginPage'
 import { PublicHeader } from '../auth/PublicHeader'
+import { signInAttempt } from '../auth/signInAttempt'
 import { SignInForm } from '../auth/SignInForm'
-import { githubLinks } from './githubLinks'
+import { githubLinks, ownerPageLink } from './githubLinks'
 import { ownerMessage } from './messages'
 import { joinTarget } from './names'
 import { GitHubLink, Step, TokenChecklist } from './parts'
@@ -22,8 +23,10 @@ export function JoinPage() {
 function JoinFlow({ owner, repo }: { owner: string; repo: string }) {
   const { t } = useI18n()
   const full = `${owner}/${repo}`
-  const [invited, setInvited] = useState(false)
-  const [access, setAccess] = useState<'unknown' | 'yes' | 'no'>('unknown')
+  // Back from the fix page: the member already got past the invitation and the access check.
+  const [resumed] = useState(() => signInAttempt.get()?.from === 'join')
+  const [invited, setInvited] = useState(resumed)
+  const [access, setAccess] = useState<'unknown' | 'yes' | 'no'>(resumed ? 'yes' : 'unknown')
   const unlocked = access === 'yes'
 
   useEffect(() => {
@@ -72,14 +75,8 @@ function JoinFlow({ owner, repo }: { owner: string; repo: string }) {
               <div className="banner banner-warning stack" style={{ gap: 8 }} role="alert">
                 <span>{t('onboarding.join.accessMissing')}</span>
                 <CopyText
-                  text={ownerMessage(t, {
-                    owner,
-                    repo,
-                    ownerType: 'Organization',
-                    problem: 'noAccess',
-                    fineGrained: false,
-                  })}
-                  label={t('onboarding.diagnosis.copyOwnerMessage')}
+                  text={ownerMessage(t, { owner, repo, link: ownerPageLink(owner, repo) })}
+                  label={t('fix.copyOwner')}
                   multiline
                 />
                 <button
@@ -122,7 +119,7 @@ function JoinFlow({ owner, repo }: { owner: string; repo: string }) {
             locked={!unlocked}
             lockedText={t('onboarding.join.tokenLocked')}
           >
-            <SignInForm initialRepo={full} lockRepo />
+            <SignInForm from="join" initialRepo={full} lockRepo />
           </Step>
         </ol>
       </main>
