@@ -1,4 +1,4 @@
-import { endOfDay, format, parseISO, startOfDay } from 'date-fns'
+import { endOfDay, format, fromDateKey } from '../../domain/zoned'
 import { useMemo, useRef, useState } from 'react'
 import { EmptyState, MemberLabel, ProjectChip, Spinner } from '../../components/bits'
 import { FilterPicker } from '../../components/Pickers'
@@ -196,11 +196,10 @@ export default function StatsPage() {
 
   const range: DateRange = useMemo(() => {
     if (preset !== 'custom') return presetRange(preset)
-    const from = startOfDay(parseISO(custom.from))
-    const to = endOfDay(parseISO(custom.to))
-    return Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to < from
-      ? presetRange('thisMonth')
-      : { from, to }
+    const from = fromDateKey(custom.from)
+    const toDay = fromDateKey(custom.to)
+    const to = toDay && endOfDay(toDay)
+    return !from || !to || to < from ? presetRange('thisMonth') : { from, to }
   }, [preset, custom])
 
   const query = useEntries(range)

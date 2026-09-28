@@ -1,4 +1,5 @@
-import { formatDistanceStrict, isSameDay } from 'date-fns'
+import { formatDistanceStrict } from 'date-fns'
+import { isSameDay } from '../../domain/zoned'
 import { useEffect, useState } from 'react'
 import { Modal } from '../../components/Modal'
 import { useI18n } from '../../i18n'

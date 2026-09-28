@@ -3,6 +3,7 @@
  * which require the first entry (`mimetype`) to be stored anyway, and keeps a compression
  * library out of the bundle.
  */
+import { wallClock } from '../../domain/zoned'
 
 const CRC_TABLE = (() => {
   const table = new Uint32Array(256)
@@ -25,11 +26,12 @@ export interface ZipEntry {
   data: Uint8Array | string
 }
 
-/** MS-DOS date and time, as zip headers store them (local time, 2-second resolution). */
+/** MS-DOS date and time, as zip headers store them (wall clock, 2-second resolution). */
 function dosDateTime(d: Date): { time: number; date: number } {
+  const w = wallClock(d)
   return {
-    time: (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1),
-    date: ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate(),
+    time: (w.hours << 11) | (w.minutes << 5) | (w.seconds >> 1),
+    date: ((w.year - 1980) << 9) | ((w.month + 1) << 5) | w.day,
   }
 }
 

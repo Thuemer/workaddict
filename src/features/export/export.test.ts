@@ -6,7 +6,8 @@ import type { TimeEntry, Workspace } from '../../domain/types'
 import { csvDialect, reportCsv } from './csv'
 import { odsFiles, xml } from './ods'
 import { buildReport, cellValue, reportSheets, shortDateParts, type Report } from './report'
-import { xlsxDateFormat, xlsxTimeFormat, xlsxWorkbook } from './xlsx'
+import { setTeamZone } from '../../timeZone'
+import { excelDate, xlsxDateFormat, xlsxTimeFormat, xlsxWorkbook } from './xlsx'
 
 const H = 3_600_000
 const ws: Workspace = {
@@ -249,5 +250,34 @@ describe('Excel export', () => {
   it('uses 12-hour times when the app does', async () => {
     const wb = await xlsxWorkbook(report([entry(1, 1)], enUS, '12h'))
     expect(wb.getWorksheet('exports.entries')!.getCell('B2').numFmt).toBe('h:mm AM/PM')
+  })
+})
+
+describe('exports in the team time zone', () => {
+  afterEach(() => setTeamZone(null))
+
+  // 06:00 UTC is 08:00 in Vienna; the process runs on UTC like a privacy browser.
+  const vienna = (): TimeEntry => ({
+    ...entry(21, 1),
+    start: '2026-09-21T06:00:00.000Z',
+    end: '2026-09-21T07:00:00.000Z',
+  })
+
+  it('writes CSV and ODS times on the zone clock', () => {
+    setTeamZone('Europe/Vienna')
+    expect(reportCsv(report([vienna()], de)).split('\r\n')[1]).toMatch(/^2026-09-21;08:00;09:00;/)
+    const ods = odsFiles(report([vienna()])).find((f) => f.name === 'content.xml')!.data as string
+    expect(ods).toContain('office:time-value="PT08H00M00S"')
+  })
+
+  it('shifts Excel cells so Excel shows the zone clock', () => {
+    setTeamZone('Europe/Vienna')
+    expect(excelDate(new Date('2026-09-21T06:00:00Z')).toISOString()).toBe(
+      '2026-09-21T08:00:00.000Z',
+    )
+    setTeamZone(null)
+    expect(excelDate(new Date('2026-09-21T06:00:00Z')).toISOString()).toBe(
+      '2026-09-21T06:00:00.000Z',
+    )
   })
 })

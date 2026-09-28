@@ -109,6 +109,22 @@ describe('workspaceCodec', () => {
     expect(workspaceCodec.encode(d.value, d.rest)).toEqual(raw)
   })
 
+  it('reads a valid team time zone and writes it back', () => {
+    const raw = { projects: [], tags: [], timeZone: 'Europe/Vienna' }
+    const d = workspaceCodec.decode(raw, 'workspace.json')
+    expect(d.value.timeZone).toBe('Europe/Vienna')
+    expect(d.issues).toBe(0)
+    expect(workspaceCodec.encode(d.value, d.rest)).toEqual(raw)
+  })
+
+  it('ignores an invalid team time zone, counts it, and keeps it on write', () => {
+    const raw = { projects: [], tags: [], timeZone: 'Mars/Olympus' }
+    const d = workspaceCodec.decode(raw, 'workspace.json')
+    expect(d.value.timeZone).toBeUndefined()
+    expect(d.issues).toBe(1)
+    expect(workspaceCodec.encode(d.value, d.rest)).toEqual(raw)
+  })
+
   it('replaces an invalid color and keeps invalid records on write', () => {
     const badProject = { id: 'p2', name: 5 }
     const d = workspaceCodec.decode(

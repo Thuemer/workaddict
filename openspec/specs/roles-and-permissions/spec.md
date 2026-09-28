@@ -41,6 +41,8 @@ The system SHALL grant permissions by effective role as follows, and SHALL hide 
 | Stop or discard other members' running timers | no | yes | yes |
 | Create, rename, recolor, archive, and delete projects and tags | no | yes | yes |
 | Run the Clockify import | no | no | yes |
+| Set the team time zone | no | no | yes |
+| Shift entry times | no | no | yes |
 | Assign roles | owner only | owner only | owner only |
 
 #### Scenario: Worker cannot manage projects
@@ -62,6 +64,10 @@ The system SHALL grant permissions by effective role as follows, and SHALL hide 
 #### Scenario: Editor stops another member's timer
 - **WHEN** an editor stops `bob`'s running timer
 - **THEN** the entry is saved in `bob`'s entry file and `bob`'s timer is cleared
+
+#### Scenario: Editor cannot change the team time zone
+- **WHEN** an editor opens Settings
+- **THEN** the team time zone is shown read-only and no "Shift entry times" action is shown
 
 ### Requirement: Role storage
 The system SHALL store role assignments in `roles.json` in the data repository as a map from GitHub login to role, and SHALL treat a missing or unreadable file as containing no assignments.

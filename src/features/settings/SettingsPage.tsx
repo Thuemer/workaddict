@@ -26,7 +26,9 @@ import { TeamHelper } from '../onboarding/TeamHelper'
 import { downloadBackup } from '../export/backup'
 import { setStopOnClose, useStopOnClose } from '../tracker/stopOnClose'
 import { ReassignEntriesModal } from './ReassignEntries'
+import { ShiftEntriesModal } from './ShiftEntries'
 import { RoleBadge, TeamRolesSection } from './TeamRoles'
+import { TimeZoneSection } from './TimeZoneSection'
 
 const ImportWizard = lazyWithReload(() => import('../import/ImportWizard'))
 
@@ -42,6 +44,7 @@ export default function SettingsPage() {
   const [backingUp, setBackingUp] = useState(false)
   const [importing, setImporting] = useState(false)
   const [reassigning, setReassigning] = useState(false)
+  const [shifting, setShifting] = useState(false)
   const repoEmpty = useQuery({
     queryKey: ['importAvailable'],
     queryFn: () => adapter.isEmpty(),
@@ -144,6 +147,8 @@ export default function SettingsPage() {
         </div>
       </section>
 
+      <TimeZoneSection />
+
       <section className="section">
         <h2>{t('settings.timer')}</h2>
         <div className="card settings-list">
@@ -212,6 +217,16 @@ export default function SettingsPage() {
               </button>
             </div>
           )}
+          {access.can('shiftEntries') && (
+            <div className="settings-row">
+              <span className="muted small" style={{ flex: '1 1 260px' }}>
+                {t('shift.settingsHint')}
+              </span>
+              <button className="btn" onClick={() => setShifting(true)} disabled={adapter.readOnly}>
+                {t('shift.start')}
+              </button>
+            </div>
+          )}
           <div className="settings-row">
             <span className="muted small" style={{ flex: '1 1 260px' }}>
               {t('settings.logoutHint')}
@@ -271,6 +286,7 @@ export default function SettingsPage() {
         </Suspense>
       )}
       {reassigning && <ReassignEntriesModal onClose={() => setReassigning(false)} />}
+      {shifting && <ShiftEntriesModal onClose={() => setShifting(false)} />}
     </>
   )
 }

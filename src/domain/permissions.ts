@@ -5,6 +5,8 @@ export type Action =
   | 'manageWorkspace'
   | 'import'
   | 'reassignEntries'
+  | 'shiftEntries'
+  | 'setTeamTimeZone'
   | 'viewLiveActivity'
   | 'stopOthersTimer'
   | 'assignRoles'
@@ -16,6 +18,8 @@ const MIN_ROLE: Record<Exclude<Action, 'assignRoles'>, Role> = {
   manageWorkspace: 'editor',
   import: 'leader',
   reassignEntries: 'leader',
+  shiftEntries: 'leader',
+  setTeamTimeZone: 'leader',
   viewLiveActivity: 'editor',
   stopOthersTimer: 'editor',
 }

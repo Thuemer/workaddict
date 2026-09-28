@@ -1,4 +1,4 @@
-import { format } from 'date-fns'
+import { format } from '../../domain/zoned'
 import { jsPDF } from 'jspdf'
 import { autoTable, type RowInput } from 'jspdf-autotable'
 import { formatHM, formatTime } from '../../domain/time'

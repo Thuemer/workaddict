@@ -38,7 +38,7 @@ Browser (this app, GitHub Pages)  ──GitHub REST API──►  private data r
 ```
 
 - Each member writes only their own entry and timer files, so members don't overwrite each other. `workspace.json` is shared, and its writes retry automatically on conflicts.
-- Timestamps are stored in UTC and shown in local time.
+- Timestamps are stored in UTC and shown in the team time zone (`timeZone` in `workspace.json`, set by team leaders under Settings → Time zone). Without one, each browser's zone is used. Privacy browsers often report UTC, so set a team time zone to keep everyone's times aligned.
 - Team members are the collaborators of the data repo. Everyone sees everyone's entries. Who may change what depends on their [role](#5-assign-roles).
 - `roles.json` stores the role of each member (optional; created when an owner assigns the first role).
 - On the first login the app creates `tracker.json` and `workspace.json` in an empty data repo.

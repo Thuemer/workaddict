@@ -1,5 +1,6 @@
 import {
   addDays,
+  addMonths,
   addWeeks,
   differenceInCalendarDays,
   endOfDay,
@@ -10,15 +11,12 @@ import {
   startOfMonth,
   startOfWeek,
   startOfYear,
-  subMonths,
-  subWeeks,
-} from 'date-fns'
+} from '../../domain/zoned'
 import { durationMs } from '../../domain/time'
 import type { DateRange, TimeEntry, Workspace } from '../../domain/types'
 
 export const NO_PROJECT = '__none__'
 export const NO_TAG = '__none__'
-const WEEK = { weekStartsOn: 1 } as const
 
 // ---- ranges ------------------------------------------------------------------
 
@@ -32,21 +30,21 @@ export const RANGE_PRESETS: RangePreset[] = [
   'thisYear',
 ]
 
-/** Local-time range for a preset; weeks start on Monday. */
+/** Range for a preset in the effective time zone; weeks start on Monday. */
 export function presetRange(preset: RangePreset, now = new Date()): DateRange {
   switch (preset) {
     case 'today':
       return { from: startOfDay(now), to: endOfDay(now) }
     case 'thisWeek':
-      return { from: startOfWeek(now, WEEK), to: endOfWeek(now, WEEK) }
+      return { from: startOfWeek(now), to: endOfWeek(now) }
     case 'lastWeek': {
-      const d = subWeeks(now, 1)
-      return { from: startOfWeek(d, WEEK), to: endOfWeek(d, WEEK) }
+      const d = addWeeks(now, -1)
+      return { from: startOfWeek(d), to: endOfWeek(d) }
     }
     case 'thisMonth':
       return { from: startOfMonth(now), to: endOfMonth(now) }
     case 'lastMonth': {
-      const d = subMonths(now, 1)
+      const d = addMonths(now, -1)
       return { from: startOfMonth(d), to: endOfMonth(d) }
     }
     case 'thisYear':
@@ -193,7 +191,7 @@ export function timeBuckets(
   ws: Workspace,
   granularity: Granularity = granularityFor(range),
 ): Bucket[] {
-  const bucketStart = (d: Date) => (granularity === 'day' ? startOfDay(d) : startOfWeek(d, WEEK))
+  const bucketStart = (d: Date) => (granularity === 'day' ? startOfDay(d) : startOfWeek(d))
   const step = (d: Date) => (granularity === 'day' ? addDays(d, 1) : addWeeks(d, 1))
   const buckets = new Map<number, Bucket>()
   for (let d = bucketStart(range.from); d <= range.to; d = step(d)) {

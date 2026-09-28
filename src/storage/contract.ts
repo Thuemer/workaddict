@@ -321,6 +321,130 @@ export function runAdapterContract(name: string, setup: ContractSetup) {
       })
     })
 
+    describe('team time zone', () => {
+      const MIN = 60_000
+      const H = 60 * MIN
+
+      it('omits the zone on initialization when the browser reports UTC', async () => {
+        expect((await alice.getWorkspace()).timeZone).toBeUndefined()
+      })
+
+      it("writes the creator's browser zone on initialization", async () => {
+        const real = Intl.DateTimeFormat.prototype.resolvedOptions
+        const spy = vi
+          .spyOn(Intl.DateTimeFormat.prototype, 'resolvedOptions')
+          .mockImplementation(function (this: Intl.DateTimeFormat) {
+            return { ...real.call(this), timeZone: 'Europe/Vienna' }
+          })
+        try {
+          const fresh = await setup()
+          await fresh.alice.init()
+          expect((await fresh.alice.getWorkspace()).timeZone).toBe('Europe/Vienna')
+        } finally {
+          spy.mockRestore()
+        }
+      })
+
+      it('lets team leaders set and clear it, keeping projects', async () => {
+        await alice.updateWorkspace(
+          (ws) => ({ ...ws, projects: [{ id: 'p1', name: 'A', color: '#000', archived: false }] }),
+          'add A',
+        )
+        await alice.setTeamTimeZone('Europe/Vienna')
+        expect(await bob.getWorkspace()).toMatchObject({ timeZone: 'Europe/Vienna', projects: [{ name: 'A' }] })
+        await alice.setTeamTimeZone(null)
+        expect((await bob.getWorkspace()).timeZone).toBeUndefined()
+      })
+
+      it('refuses other roles and invalid zones', async () => {
+        await alice.setRole('bob', 'editor')
+        await expect(bob.setTeamTimeZone('Europe/Vienna')).rejects.toSatisfy((x: unknown) =>
+          isStorageError(x, 'forbiddenRole'),
+        )
+        await expect(alice.setTeamTimeZone('Mars/Olympus')).rejects.toSatisfy((x: unknown) =>
+          isStorageError(x, 'invalid'),
+        )
+        expect((await alice.getWorkspace()).timeZone).toBeUndefined()
+      })
+
+      it('keeps the zone when projects change or data is imported', async () => {
+        await alice.setTeamTimeZone('Europe/Vienna')
+        await alice.setRole('bob', 'editor')
+        await bob.updateWorkspace(() => ({ projects: [], tags: [], timeZone: 'UTC' }), 'rename')
+        expect((await alice.getWorkspace()).timeZone).toBe('Europe/Vienna')
+        await alice.importData(
+          { workspace: { projects: [], tags: [] }, entries: [] },
+          'test import',
+          { overwrite: true },
+        )
+        expect((await alice.getWorkspace()).timeZone).toBe('Europe/Vienna')
+      })
+
+      describe('shifting entries', () => {
+        const range = {
+          from: new Date('2026-09-01T00:00:00Z'),
+          to: new Date('2026-09-28T23:59:59Z'),
+        }
+
+        it('shifts entries in the range and keeps their durations', async () => {
+          const a = await bob.saveEntry(entry('bob', '2026-09-21T10:00:00Z', '2026-09-21T11:30:00Z'))
+          const outside = await bob.saveEntry(entry('bob', '2026-09-29T10:00:00Z', '2026-09-29T11:00:00Z'))
+          const other = await alice.saveEntry(entry('alice', '2026-09-21T10:00:00Z', '2026-09-21T11:00:00Z'))
+
+          expect(await alice.shiftEntries('bob', range, -2 * H)).toBe(1)
+
+          const all = await alice.listAllEntries()
+          const byId = new Map(all.map((e) => [e.id, e]))
+          expect(byId.get(a.id)).toMatchObject({
+            start: '2026-09-21T08:00:00.000Z',
+            end: '2026-09-21T09:30:00.000Z',
+            login: 'bob',
+            description: a.description,
+          })
+          expect(byId.get(outside.id)?.start).toBe(outside.start)
+          expect(byId.get(other.id)?.start).toBe(other.start)
+        })
+
+        it('moves an entry to the month of its new start', async () => {
+          const e = await bob.saveEntry(entry('bob', '2026-10-01T00:30:00Z', '2026-10-01T01:30:00Z'))
+          const n = await alice.shiftEntries(
+            'bob',
+            { from: new Date('2026-10-01T00:00:00Z'), to: new Date('2026-10-01T23:59:59Z') },
+            -2 * H,
+          )
+          expect(n).toBe(1)
+          expect(await alice.listEntries(SEPT)).toMatchObject([
+            { id: e.id, start: '2026-09-30T22:30:00.000Z' },
+          ])
+          expect(await alice.listAllEntries()).toHaveLength(1)
+        })
+
+        it('keeps the running timer', async () => {
+          const { timer } = await bob.startTimer({ description: 'x', projectId: null, tagIds: [] })
+          await bob.saveEntry(entry('bob', '2026-09-21T10:00:00Z', '2026-09-21T11:00:00Z'))
+          await alice.shiftEntries('bob', range, -2 * H)
+          expect((await alice.listTimers())[0]?.start).toBe(timer.start)
+        })
+
+        it('returns 0 without writing when nothing matches', async () => {
+          expect(await alice.shiftEntries('bob', range, 2 * H)).toBe(0)
+        })
+
+        it('refuses other roles and offsets out of bounds', async () => {
+          await bob.saveEntry(entry('bob', '2026-09-21T10:00:00Z', '2026-09-21T11:00:00Z'))
+          await alice.setRole('bob', 'editor')
+          await expect(bob.shiftEntries('bob', range, H)).rejects.toSatisfy((x: unknown) =>
+            isStorageError(x, 'forbiddenRole'),
+          )
+          for (const bad of [0, 25 * H, 1.5])
+            await expect(alice.shiftEntries('bob', range, bad)).rejects.toSatisfy((x: unknown) =>
+              isStorageError(x, 'invalid'),
+            )
+          expect((await alice.listEntries(SEPT))[0]?.start).toBe('2026-09-21T10:00:00Z')
+        })
+      })
+    })
+
     describe('import', () => {
       const data = () => ({
         workspace: {

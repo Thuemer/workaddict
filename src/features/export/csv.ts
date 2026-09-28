@@ -1,4 +1,5 @@
-import { format, type Locale } from 'date-fns'
+import type { Locale } from 'date-fns'
+import { format } from '../../domain/zoned'
 import { downloadBlob } from './download'
 import {
   cellKind,

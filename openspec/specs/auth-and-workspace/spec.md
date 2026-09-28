@@ -84,7 +84,7 @@ The system SHALL provide a logout action that removes the token and repository f
 - **THEN** the system removes stored credentials and cached data and shows the login page
 
 ### Requirement: Data repository initialization
-The system SHALL initialize an empty data repository by creating `tracker.json` (with `schemaVersion`) and an empty `workspace.json` when they are absent.
+The system SHALL initialize an empty data repository by creating `tracker.json` (with `schemaVersion`) and an empty `workspace.json` when they are absent. The new `workspace.json` SHALL contain `timeZone` set to the zone the browser reports, unless the browser reports UTC, in which case `timeZone` SHALL be omitted.
 
 #### Scenario: First login to an empty repository
 - **WHEN** a user logs in to a repository without `tracker.json`
@@ -93,6 +93,14 @@ The system SHALL initialize an empty data repository by creating `tracker.json` 
 #### Scenario: Newer schema version
 - **WHEN** `tracker.json` declares a schema version newer than the app supports
 - **THEN** the system opens in read-only mode and shows a message to reload or update the app
+
+#### Scenario: Initial team time zone
+- **WHEN** a user whose browser reports `Europe/Vienna` logs in to a repository without `tracker.json`
+- **THEN** the created `workspace.json` contains `"timeZone": "Europe/Vienna"`
+
+#### Scenario: Browser reports UTC on initialization
+- **WHEN** a user whose browser reports `UTC` logs in to a repository without `tracker.json`
+- **THEN** the created `workspace.json` has no `timeZone`
 
 ### Requirement: Team members
 The system SHALL list team members as the collaborators of the data repository, showing each member's GitHub login, avatar, and role, marking repository admins as owners, and SHALL fall back to logins found in the repository's data files and `roles.json` when the collaborator list is unavailable.

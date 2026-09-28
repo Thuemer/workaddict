@@ -22,4 +22,77 @@ export default tseslint.config(
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
     },
   },
+  {
+    // Clock times and calendar days must use the effective time zone (src/timeZone.ts), never
+    // the browser's zone, which privacy browsers report as UTC. src/domain/zoned.ts is the one
+    // place that may call the zone-dependent APIs; tests pin the process zone and build dates
+    // freely, and the demo data only needs to look plausible.
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: [
+      '**/*.test.{ts,tsx}',
+      'src/test/**',
+      'src/domain/zoned.ts',
+      'src/features/auth/demoData.ts',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'date-fns',
+              importNames: [
+                'addDays',
+                'addMonths',
+                'addWeeks',
+                'differenceInCalendarDays',
+                'eachDayOfInterval',
+                'endOfDay',
+                'endOfMonth',
+                'endOfWeek',
+                'endOfYear',
+                'format',
+                'getHours',
+                'isSameDay',
+                'isSameMonth',
+                'isSameWeek',
+                'isToday',
+                'isYesterday',
+                'parse',
+                'parseISO',
+                'setHours',
+                'setMinutes',
+                'startOfDay',
+                'startOfMonth',
+                'startOfWeek',
+                'startOfYear',
+                'subDays',
+                'subMonths',
+                'subWeeks',
+              ],
+              message: 'Use the zone-aware helper from src/domain/zoned.ts.',
+            },
+          ],
+        },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            'CallExpression[callee.property.name=/^(get|set)(FullYear|Month|Date|Day|Hours|Minutes|Seconds)$/]',
+          message: 'Local Date getters/setters use the browser zone; use src/domain/zoned.ts.',
+        },
+        {
+          selector:
+            'CallExpression[callee.property.name=/^(toDateString|toTimeString|toLocaleDateString|toLocaleTimeString|toLocaleString)$/]',
+          message: 'Browser-zone formatting; use format() from src/domain/zoned.ts.',
+        },
+        {
+          selector: "NewExpression[callee.name='Date'][arguments.length>=2]",
+          message:
+            'new Date(y, m, d, …) uses the browser zone; use fromWallClock() from src/domain/zoned.ts.',
+        },
+      ],
+    },
+  },
 )

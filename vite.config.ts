@@ -55,6 +55,9 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
+    // Pin the process zone so no test passes only because of the machine's zone; zone-aware
+    // code is tested with explicit zones such as Europe/Vienna.
+    env: { TZ: 'UTC' },
     css: false,
   },
 })

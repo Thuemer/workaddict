@@ -1,5 +1,6 @@
 import type { TFunction } from 'i18next'
-import { format, type Locale } from 'date-fns'
+import type { Locale } from 'date-fns'
+import { format } from '../../domain/zoned'
 import type { DateRange, TimeEntry, Workspace } from '../../domain/types'
 import { durationMs, type TimeFormat } from '../../domain/time'
 import {

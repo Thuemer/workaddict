@@ -1,4 +1,4 @@
-import { format, isToday, isYesterday, startOfDay } from 'date-fns'
+import { format, isToday, isYesterday, startOfDay } from '../../domain/zoned'
 import { useCallback, useMemo, useState } from 'react'
 import { MemberLabel, ProjectChip } from '../../components/bits'
 import { Icon } from '../../components/Icon'

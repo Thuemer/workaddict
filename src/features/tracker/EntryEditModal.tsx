@@ -1,4 +1,4 @@
-import { isSameDay } from 'date-fns'
+import { isSameDay } from '../../domain/zoned'
 import { useState, type FormEvent } from 'react'
 import type { ManualTimeResult } from '../../domain/time'
 import { Modal } from '../../components/Modal'

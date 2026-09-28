@@ -9,6 +9,7 @@ import { TrackerPage } from '../features/tracker/TrackerPage'
 import { useI18n } from '../i18n'
 import { Layout } from './Layout'
 import { lazyWithReload } from './lazyPage'
+import { ZoneScope } from './ZoneScope'
 
 // Secondary pages are split out so the tracker loads fast.
 const StatsPage = lazyWithReload(() => import('../features/stats/StatsPage'))
@@ -32,7 +33,13 @@ export function App() {
         </Routes>
       ) : (
         <Routes>
-          <Route element={<Layout />}>
+          <Route
+            element={
+              <ZoneScope>
+                <Layout />
+              </ZoneScope>
+            }
+          >
             <Route index element={<TrackerPage />} />
             <Route path="stats" element={<StatsPage />} />
             <Route path="groups" element={<WorkGroupsPage />} />

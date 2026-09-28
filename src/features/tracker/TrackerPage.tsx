@@ -1,4 +1,4 @@
-import { addMonths, endOfMonth, startOfMonth, subMonths } from 'date-fns'
+import { addMonths, endOfMonth, startOfMonth } from '../../domain/zoned'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { EmptyState, Spinner } from '../../components/bits'
 import { useI18n } from '../../i18n'
@@ -7,6 +7,7 @@ import { useAccess, useEntries } from '../data/hooks'
 import { EntryList } from './EntryList'
 import { TeamNow } from './TeamNow'
 import { TimerBar } from './TimerBar'
+import { UtcZoneNotice } from './UtcZoneNotice'
 
 /** Consecutive months without new entries after which "load older" gives up. */
 const MAX_EMPTY_MONTHS = 12
@@ -21,7 +22,7 @@ export function TrackerPage() {
   const range = useMemo(() => {
     const now = new Date()
     return {
-      from: startOfMonth(subMonths(now, months - 1)),
+      from: startOfMonth(addMonths(now, 1 - months)),
       to: endOfMonth(addMonths(now, 1)),
     }
   }, [months])
@@ -77,6 +78,7 @@ export function TrackerPage() {
 
   return (
     <>
+      <UtcZoneNotice />
       <TimerBar />
       {access.can('viewLiveActivity') && <TeamNow />}
 

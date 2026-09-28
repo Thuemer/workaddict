@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { endOfDay, startOfDay } from 'date-fns'
+import { endOfDay, startOfDay } from '../../domain/zoned'
 import { useEffect, useRef } from 'react'
 import { useToast } from '../../components/Toasts'
 import type { RunningTimer } from '../../domain/types'

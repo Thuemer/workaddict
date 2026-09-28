@@ -5,6 +5,7 @@ import {
   formatHM,
   formatTime,
   isValidDuration,
+  localDateTime,
   parseClockTime,
   parseDuration,
   resolveManualTimes,
@@ -241,5 +242,53 @@ describe('resolveTimerStart', () => {
       ok: false,
       error: 'invalidStart',
     })
+  })
+})
+
+describe('in the Europe/Vienna zone while the process runs on UTC', () => {
+  const VIENNA = 'Europe/Vienna'
+
+  it('shows stored times on the zone clock', () => {
+    expect(formatTime('2026-09-21T06:00:00Z', '24h', VIENNA)).toBe('08:00')
+    expect(formatTime('2026-09-21T06:00:00Z', '24h', 'UTC')).toBe('06:00')
+  })
+
+  it('reads typed times on the zone clock', () => {
+    const r = resolveManualTimes(
+      { date: '2026-09-21', startTime: '08:00', endTime: '09:00' },
+      VIENNA,
+    )
+    expect(r).toMatchObject({ ok: true, overnight: false })
+    if (!r.ok) return
+    expect(r.start.toISOString()).toBe('2026-09-21T06:00:00.000Z')
+    expect(r.end.toISOString()).toBe('2026-09-21T07:00:00.000Z')
+    expect(localDateTime('2026-10-26', '08:00', VIENNA)?.toISOString()).toBe(
+      '2026-10-26T07:00:00.000Z',
+    )
+  })
+
+  it('rolls an overnight end over to the next zone day', () => {
+    const r = resolveManualTimes(
+      { date: '2026-09-21', startTime: '23:00', endTime: '01:00' },
+      VIENNA,
+    )
+    expect(r.ok && r.end.toISOString()).toBe('2026-09-21T23:00:00.000Z')
+    expect(r.ok && r.overnight).toBe(true)
+  })
+
+  it('edits inline times on the zone day', () => {
+    // 00:30 on 22 September in Vienna (still 21 September in UTC)
+    const start = new Date('2026-09-21T22:30:00Z')
+    const end = new Date('2026-09-21T23:30:00Z')
+    const r = applyInlineTime(start, end, 'start', '00:15', VIENNA)
+    expect(r.ok && r.start.toISOString()).toBe('2026-09-21T22:15:00.000Z')
+    expect(r.ok && r.overnight).toBe(false)
+  })
+
+  it('reads a timer start as yesterday on the zone clock after midnight', () => {
+    const now = new Date('2026-09-21T22:30:00Z') // 00:30 in Vienna
+    const current = new Date('2026-09-21T19:00:00Z') // 21:00 yesterday in Vienna
+    const r = resolveTimerStart(current, '21:15', now, VIENNA)
+    expect(r.ok && r.start.toISOString()).toBe('2026-09-21T19:15:00.000Z')
   })
 })

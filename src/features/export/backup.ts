@@ -1,4 +1,4 @@
-import { format } from 'date-fns'
+import { format } from '../../domain/zoned'
 import type { StorageAdapter } from '../../storage'
 import { downloadBlob } from './download'
 

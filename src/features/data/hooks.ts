@@ -5,7 +5,7 @@ import {
   type QueryClient,
   type QueryKey,
 } from '@tanstack/react-query'
-import { endOfDay, startOfDay } from 'date-fns'
+import { endOfDay, startOfDay } from '../../domain/zoned'
 import { useCallback, useMemo } from 'react'
 import { can, type Action } from '../../domain/permissions'
 import type {
@@ -363,6 +363,17 @@ export function useUpdateWorkspace() {
     },
     onSuccess: (ws) => qc.setQueryData(keys.workspace, ws),
     onError: (_e, _v, snap) => restore(qc, snap),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.workspace }),
+  })
+}
+
+export function useSetTeamTimeZone(feedback?: MutationFeedback<void>) {
+  const { adapter } = useSessionData()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (zone: string | null) => adapter.setTeamTimeZone(zone),
+    onSuccess: () => feedback?.onSuccess?.(undefined),
+    onError: (e) => feedback?.onError?.(e),
     onSettled: () => qc.invalidateQueries({ queryKey: keys.workspace }),
   })
 }

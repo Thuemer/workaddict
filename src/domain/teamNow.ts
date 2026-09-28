@@ -1,4 +1,4 @@
-import { startOfDay } from 'date-fns'
+import { addDays, startOfDay } from './zoned'
 import { durationMs } from './time'
 import type { Member, RunningTimer, TimeEntry } from './types'
 
@@ -44,7 +44,7 @@ export function buildTeamRows(input: {
 }): TeamRow[] {
   const { members, timers, entries, me, now } = input
   const dayStart = startOfDay(now).getTime()
-  const dayEnd = dayStart + 24 * HOUR
+  const dayEnd = addDays(dayStart, 1).getTime()
   const timerByLogin = new Map(timers.map((t) => [t.login, t]))
 
   const logins = new Map(members.map((m) => [m.login, m]))

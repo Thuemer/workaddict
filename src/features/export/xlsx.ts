@@ -1,4 +1,4 @@
-import { format } from 'date-fns'
+import { format, wallClock } from '../../domain/zoned'
 import type { Worksheet } from 'exceljs'
 import type { BreakdownRow } from '../stats/stats'
 import { downloadBlob } from './download'
@@ -7,13 +7,12 @@ import { shortDateParts, type DatePart, type Report } from './report'
 const HOUR = 3_600_000
 
 /**
- * exceljs writes Date cells as UTC. Shift local wall-clock time into UTC so Excel shows
- * the same date and time the user sees in the app.
+ * exceljs writes Date cells as UTC. Shift the wall-clock time of the effective time zone into
+ * UTC so Excel shows the same date and time the user sees in the app.
  */
-function excelDate(d: Date): Date {
-  return new Date(
-    Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds()),
-  )
+export function excelDate(d: Date): Date {
+  const w = wallClock(d)
+  return new Date(Date.UTC(w.year, w.month, w.day, w.hours, w.minutes, w.seconds))
 }
 
 /** Excel number format for the locale's short date: `dd.mm.yyyy`, `mm/dd/yyyy`. */

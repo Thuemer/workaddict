@@ -65,8 +65,13 @@ export interface StorageAdapter {
   discardTimer(target?: TimerTarget): Promise<boolean>
 
   getWorkspace(): Promise<Workspace>
-  /** Applies a pure update function; it may be re-run on write conflicts. */
+  /**
+   * Applies a pure update function to projects and tags; it may be re-run on write conflicts.
+   * The team time zone is kept as stored.
+   */
   updateWorkspace(fn: (ws: Workspace) => Workspace, summary: string): Promise<Workspace>
+  /** Sets or (with null) clears the team time zone in `workspace.json`. Team leaders only. */
+  setTeamTimeZone(zone: string | null): Promise<void>
 
   exportBackup(): Promise<BackupFile>
 
@@ -84,6 +89,13 @@ export interface StorageAdapter {
    * only. Returns the number of moved entries; nothing is written when it is 0.
    */
   reassignEntries(from: string, to: string, opts?: { before?: Date }): Promise<number>
+  /**
+   * Adds `deltaMs` (non-zero, at most 24 hours either way) to the start and end of the entries of
+   * `login` starting within the range (inclusive), in one commit; entries move to the month file
+   * of their new start. Repairs times saved with a wrong time zone. Team leaders only. Returns
+   * the number of shifted entries; nothing is written when it is 0. The running timer is kept.
+   */
+  shiftEntries(login: string, range: DateRange, deltaMs: number): Promise<number>
 
   /**
    * Data files that could not be fully read in recent reads: records that failed validation, or

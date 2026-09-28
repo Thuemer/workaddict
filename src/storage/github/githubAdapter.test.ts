@@ -412,6 +412,64 @@ describe('GitHub multi-file write (import)', () => {
     expect(gh.json('entries/bob/2025-11.json')).toMatchObject([{ login: 'bob' }])
   })
 
+  it('shifts entries in one commit, moving them across months', async () => {
+    const { gh, a } = await setup()
+    await a.importData(data(), 'x')
+    const before = gh.commits
+    const range = { from: new Date('2025-10-01T00:00:00Z'), to: new Date('2025-10-31T23:59:59Z') }
+    expect(await a.shiftEntries('bob', range, -2 * 3_600_000)).toBe(1)
+    expect(gh.commits - before).toBe(1)
+    expect(gh.messages.at(-1)).toBe(
+      'shift: 1 entry of bob by -2:00 from 2025-10-01 to 2025-10-31 (alice)',
+    )
+    expect(gh.json('entries/bob/2025-10.json')).toMatchObject([
+      { start: '2025-10-10T06:00:00.000Z', end: '2025-10-10T07:00:00.000Z' },
+    ])
+  })
+
+  it('deletes a month file emptied by a shift', async () => {
+    const { gh, a } = await setup()
+    await a.importData(data(), 'x')
+    await a.saveEntry({
+      ...mk('alice', '2025-12'),
+      start: '2025-12-01T00:30:00.000Z',
+      end: '2025-12-01T01:30:00.000Z',
+    })
+    const range = { from: new Date('2025-12-01T00:00:00Z'), to: new Date('2025-12-01T23:59:59Z') }
+    expect(await a.shiftEntries('alice', range, -3_600_000)).toBe(1)
+    expect(gh.files.has('entries/alice/2025-12.json')).toBe(false)
+    expect(gh.json('entries/alice/2025-11.json')).toHaveLength(2)
+  })
+
+  it('aborts a shift when the affected entries change meanwhile', async () => {
+    const { gh, a } = await setup()
+    await a.importData(data(), 'x')
+    gh.beforeRefUpdate = () => {
+      gh.beforeRefUpdate = null
+      gh.putRaw('entries/bob/2025-10.json', JSON.stringify([mk('bob', '2025-10')]))
+    }
+    const range = { from: new Date('2025-10-01T00:00:00Z'), to: new Date('2025-10-31T23:59:59Z') }
+    await expect(a.shiftEntries('bob', range, 3_600_000)).rejects.toSatisfy((e: unknown) =>
+      isStorageError(e, 'conflict'),
+    )
+    expect(gh.json('entries/bob/2025-10.json')).toMatchObject([
+      { start: '2025-10-10T08:00:00.000Z' },
+    ])
+  })
+
+  it('writes the team time zone with a descriptive commit', async () => {
+    const messages: string[] = []
+    const { gh, a } = await setup((orig) => async (input, init) => {
+      if (init?.method === 'PUT') messages.push(JSON.parse(String(init.body)).message)
+      return orig(input, init)
+    })
+    await a.setTeamTimeZone('Europe/Vienna')
+    expect(messages.at(-1)).toBe('settings: team time zone Europe/Vienna (alice)')
+    expect(gh.json('workspace.json')).toMatchObject({ timeZone: 'Europe/Vienna' })
+    await a.setTeamTimeZone(null)
+    expect(messages.at(-1)).toBe('settings: team time zone cleared (alice)')
+  })
+
   it('aborts a reassignment when the affected entries change meanwhile', async () => {
     const { gh, a } = await setup()
     await a.importData(data(), 'x')

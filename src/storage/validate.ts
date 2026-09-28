@@ -1,4 +1,5 @@
 import { isRole } from '../domain/permissions'
+import { isValidZone } from '../domain/zoneNames'
 import {
   EMPTY_WORKSPACE,
   PROJECT_COLORS,
@@ -139,7 +140,7 @@ export const timerCodec: Codec<RunningTimer | null, null> = {
 interface WorkspaceRest {
   projects: unknown[]
   tags: unknown[]
-  /** Unknown top-level keys, kept as they are. */
+  /** Unknown top-level keys and an invalid `timeZone`, kept as they are. */
   other: Record<string, unknown>
 }
 
@@ -155,7 +156,7 @@ export const workspaceCodec: Codec<Workspace, WorkspaceRest> = {
   decode(raw) {
     const empty = { value: EMPTY_WORKSPACE, rest: { projects: [], tags: [], other: {} } }
     if (!isObject(raw)) return { ...empty, issues: 0, unreadable: true }
-    const { projects = [], tags = [], ...other } = raw
+    const { projects = [], tags = [], timeZone, ...other } = raw
     if (!Array.isArray(projects) || !Array.isArray(tags)) return { ...empty, issues: 0, unreadable: true }
     const p = split(projects, isProjectShape)
     const t = split(tags, isTag)
@@ -164,10 +165,11 @@ export const workspaceCodec: Codec<Workspace, WorkspaceRest> = {
       (x) => ({ ...x, color: isHexColor(x.color) ? x.color : PROJECT_COLORS[0] }) as Project,
     )
     const recolored = p.ok.filter((x) => !isHexColor(x.color)).length
+    const zoneOk = isValidZone(timeZone)
     return {
-      value: { projects: fixed, tags: t.ok },
-      rest: { projects: p.bad, tags: t.bad, other },
-      issues: p.bad.length + t.bad.length + recolored,
+      value: { projects: fixed, tags: t.ok, ...(zoneOk ? { timeZone } : {}) },
+      rest: { projects: p.bad, tags: t.bad, other: zoneOk || timeZone === undefined ? other : { ...other, timeZone } },
+      issues: p.bad.length + t.bad.length + recolored + (zoneOk || timeZone === undefined ? 0 : 1),
       unreadable: false,
     }
   },
@@ -175,6 +177,7 @@ export const workspaceCodec: Codec<Workspace, WorkspaceRest> = {
     ...rest.other,
     projects: [...value.projects, ...rest.projects],
     tags: [...value.tags, ...rest.tags],
+    ...(value.timeZone ? { timeZone: value.timeZone } : {}),
   }),
 }
 

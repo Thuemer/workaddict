@@ -1,7 +1,9 @@
 import { newId } from '../domain/ids'
 import { accessFor, can, isRole, type Action } from '../domain/permissions'
 import { monthKey, monthKeysInRange } from '../domain/month'
-import { durationMs, formatHM } from '../domain/time'
+import { durationMs, formatHM, MAX_ENTRY_MS } from '../domain/time'
+import { dateKey } from '../domain/zoned'
+import { browserZone, isValidZone, reportsUtc } from '../domain/zoneNames'
 import {
   EMPTY_WORKSPACE,
   SCHEMA_VERSION,
@@ -57,10 +59,11 @@ function isTimerPath(path: string): boolean {
   return TIMER_PATH.test(path) && isLogin(ownerOfPath(path))
 }
 
-/** "2026-09-01" in local time. */
-function localDate(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+/** A copy without the `timeZone` key. */
+function withoutZone<T extends { timeZone?: unknown }>(ws: T): Omit<T, 'timeZone'> {
+  const copy = { ...ws }
+  delete copy.timeZone
+  return copy
 }
 
 function quote(s: string): string {
@@ -168,9 +171,14 @@ export class RepoAdapter implements StorageAdapter {
       )
     }
     if (!(await this.store.listFiles()).has(PATHS.workspace)) {
+      // The creator's zone becomes the team zone, unless the browser hides it behind UTC.
+      const zone = browserZone()
+      const initial: Workspace = reportsUtc(zone)
+        ? EMPTY_WORKSPACE
+        : { ...EMPTY_WORKSPACE, timeZone: zone }
       await this.store.write<Workspace>(
         PATHS.workspace,
-        (cur) => cur ?? EMPTY_WORKSPACE,
+        (cur) => cur ?? initial,
         'init: create workspace.json',
       )
     }
@@ -473,8 +481,34 @@ export class RepoAdapter implements StorageAdapter {
     return this.writeFile(
       PATHS.workspace,
       workspaceCodec,
-      (cur) => fn(cur ?? EMPTY_WORKSPACE),
+      (cur) => {
+        // Projects and tags only: team leaders change the zone with setTeamTimeZone.
+        const next = withoutZone(fn(cur ?? EMPTY_WORKSPACE))
+        return cur?.timeZone ? { ...next, timeZone: cur.timeZone } : next
+      },
       `workspace: ${summary} (${me.login})`,
+    )
+  }
+
+  async setTeamTimeZone(zone: string | null): Promise<void> {
+    const me = await this.assertCan('setTeamTimeZone')
+    if (zone !== null && !isValidZone(zone)) {
+      throw new StorageError('invalid', `Unknown time zone ${zone}`)
+    }
+    // Edits the raw file so clearing also removes an invalid value; everything else stays.
+    await this.store.write<unknown>(
+      PATHS.workspace,
+      (raw) => {
+        const cur = raw ?? { projects: [], tags: [] }
+        if (workspaceCodec.decode(cur, PATHS.workspace).unreadable) {
+          throw new StorageError('corruptData', `${PATHS.workspace} cannot be read`, {
+            path: PATHS.workspace,
+          })
+        }
+        const rest = withoutZone(cur as Record<string, unknown>)
+        return zone ? { ...rest, timeZone: zone } : rest
+      },
+      `settings: team time zone ${zone ?? 'cleared'} (${me.login})`,
     )
   }
 
@@ -516,7 +550,13 @@ export class RepoAdapter implements StorageAdapter {
     if (data.entries.some((e) => durationMs(e.start, e.end) <= 0)) {
       throw new StorageError('invalid', 'Entries must end after they start')
     }
-    const files = new Map<string, unknown>([[PATHS.workspace, data.workspace]])
+    // An import replaces projects and tags but keeps the team zone.
+    const imported = withoutZone(data.workspace)
+    const current = await this.getWorkspace()
+    const workspace: Workspace = current.timeZone
+      ? { ...imported, timeZone: current.timeZone }
+      : imported
+    const files = new Map<string, unknown>([[PATHS.workspace, workspace]])
     const sorted = [...data.entries].sort((a, b) => a.start.localeCompare(b.start))
     for (const e of sorted) {
       const path = PATHS.entries(e.login, monthKey(e.start))
@@ -586,7 +626,7 @@ export class RepoAdapter implements StorageAdapter {
     }
     if (count === 0) return 0
 
-    const cutoff = opts?.before ? ` before ${localDate(opts.before)}` : ''
+    const cutoff = opts?.before ? ` before ${dateKey(opts.before)}` : ''
     await this.store.writeMany(
       files,
       `reassign: ${count} ${count === 1 ? 'entry' : 'entries'} from ${from} to ${to}${cutoff} (${me.login})`,
@@ -596,6 +636,81 @@ export class RepoAdapter implements StorageAdapter {
         const current = await this.store.listFiles()
         if (touched.some((p) => current.get(p) !== snapshot.get(p))) {
           throw new StorageError('conflict', 'Entries changed during the reassignment')
+        }
+        return deletes
+      },
+    )
+    return count
+  }
+
+  async shiftEntries(login: string, range: DateRange, deltaMs: number): Promise<number> {
+    const me = await this.assertCan('shiftEntries')
+    if (!isLogin(login)) throw new StorageError('invalid', `Invalid login ${login}`)
+    if (!Number.isInteger(deltaMs) || deltaMs === 0 || Math.abs(deltaMs) > MAX_ENTRY_MS) {
+      throw new StorageError('invalid', 'The shift must be between 1 minute and 24 hours')
+    }
+    const from = range.from.getTime()
+    const to = range.to.getTime()
+    const moves = (e: TimeEntry) => {
+      const t = new Date(e.start).getTime()
+      return t >= from && t <= to
+    }
+
+    this.store.invalidate()
+    const snapshot = await this.store.listFiles()
+    const months = new Set(monthKeysInRange(range.from, range.to))
+    const sources = [...snapshot.keys()].filter((p) => {
+      const m = ENTRY_PATH.exec(p)
+      return m?.[1] === login && months.has(m[2]!)
+    })
+    // Every file the shift reads or writes: valid entries plus invalid records kept untouched.
+    const loaded = new Map<string, { value: TimeEntry[]; rest: unknown[] }>()
+    const load = async (path: string) => {
+      let f = loaded.get(path)
+      if (!f) {
+        const raw = await this.store.read<unknown>(path, snapshot)
+        const d = entriesCodec.decode(raw ?? [], path)
+        if (d.unreadable) throw new StorageError('corruptData', `${path} cannot be read`, { path })
+        f = { value: d.value, rest: d.rest }
+        loaded.set(path, f)
+      }
+      return f
+    }
+    const now = new Date().toISOString()
+    const shifted: TimeEntry[] = []
+    for (const path of sources) {
+      const f = await load(path)
+      for (const e of f.value.filter(moves)) {
+        shifted.push({
+          ...e,
+          start: new Date(new Date(e.start).getTime() + deltaMs).toISOString(),
+          end: new Date(new Date(e.end).getTime() + deltaMs).toISOString(),
+          updatedAt: now,
+        })
+      }
+      f.value = f.value.filter((e) => !moves(e))
+    }
+    if (shifted.length === 0) return 0
+    for (const e of shifted) (await load(PATHS.entries(login, monthKey(e.start)))).value.push(e)
+
+    const files = new Map<string, unknown>()
+    const deletes: string[] = []
+    for (const [path, f] of loaded) {
+      if (f.value.length > 0 || f.rest.length > 0) {
+        files.set(path, entriesCodec.encode(f.value, f.rest))
+      } else if (snapshot.has(path)) deletes.push(path)
+    }
+    const count = shifted.length
+    const offset = `${deltaMs < 0 ? '-' : '+'}${formatHM(Math.abs(deltaMs))}`
+    await this.store.writeMany(
+      files,
+      `shift: ${count} ${count === 1 ? 'entry' : 'entries'} of ${login} by ${offset} from ${dateKey(range.from)} to ${dateKey(range.to)} (${me.login})`,
+      async () => {
+        // The file contents above were computed once; abort instead of overwriting newer data.
+        this.store.invalidate()
+        const current = await this.store.listFiles()
+        if ([...loaded.keys()].some((p) => current.get(p) !== snapshot.get(p))) {
+          throw new StorageError('conflict', 'Entries changed during the shift')
         }
         return deletes
       },

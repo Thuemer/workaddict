@@ -40,6 +40,8 @@ export interface Tag {
 export interface Workspace {
   projects: Project[]
   tags: Tag[]
+  /** Team time zone (IANA name); absent: each browser's own zone is used. */
+  timeZone?: string
 }
 
 export interface Member {
