@@ -31,7 +31,11 @@ The system SHALL offer the Clockify import in Settings only to team leaders and 
 - **THEN** the system writes nothing and shows the replacement warning
 
 ### Requirement: Clockify API key handling
-The system SHALL ask for a Clockify API key, SHALL send it only to Clockify's API, and SHALL NOT persist it in any browser storage, URL, log, or error message.
+The system SHALL ask for a Clockify API key, SHALL send it only to Clockify's API, and SHALL NOT persist it in any browser storage, URL, log, or error message. The system SHALL tell the user where to create the key in Clockify's current interface: account menu (top right) → Preferences → Advanced tab → Manage API keys → Generate.
+
+#### Scenario: Where to find the key
+- **WHEN** the user opens the key step of the import wizard
+- **THEN** the hint says to open the account menu in Clockify, choose Preferences, open the Advanced tab and generate a key under Manage API keys, in the current language
 
 #### Scenario: Key entered
 - **WHEN** the user pastes an API key and continues
@@ -47,7 +51,7 @@ The system SHALL ask for a Clockify API key, SHALL send it only to Clockify's AP
 
 #### Scenario: Advice after import
 - **WHEN** the import finished successfully
-- **THEN** the system recommends deleting the API key in Clockify's profile settings
+- **THEN** the system recommends deleting the API key in Clockify under Preferences → Advanced → Manage API keys
 
 ### Requirement: Workspace selection
 The system SHALL let the user choose which Clockify workspace to import when the key has access to more than one, and SHALL select it automatically when there is only one.
