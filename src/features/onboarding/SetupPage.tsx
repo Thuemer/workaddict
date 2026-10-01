@@ -580,7 +580,13 @@ export function SetupPage() {
         type="button"
         className="btn btn-primary"
         disabled={!ready}
-        onClick={() => go(firstOpen)}
+        onClick={() =>
+          // An organization found on GitHub counts as created, even before its tick is saved.
+          go(
+            steps.find((x) => !isDone(x) && !(x === 'org' && team && accountKind === 'org')) ??
+              'signIn',
+          )
+        }
       >
         {t('onboarding.setup.next')} →
       </button>
