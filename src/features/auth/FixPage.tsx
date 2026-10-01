@@ -8,7 +8,7 @@ import { ownerPageLink } from '../onboarding/githubLinks'
 import { ownerMessage } from '../onboarding/messages'
 import { joinTarget } from '../onboarding/names'
 import { GitHubLink, TokenChecklist } from '../onboarding/parts'
-import { fixSteps, needsOwner, parseLoginError } from './fixSteps'
+import { fixSteps, needsOwner, parseLoginError, setupStepFor } from './fixSteps'
 import { PublicHeader } from './PublicHeader'
 import { tokenKind } from './session'
 import { signInAttempt, type SignInFrom } from './signInAttempt'
@@ -73,9 +73,13 @@ export function FixPage() {
         })
       : null
 
+  // From the setup wizard, go back to the step that most likely needs to be redone.
+  const setupStep = from === 'setup' ? setupStepFor(error) : null
   const back =
     from === 'setup'
-      ? '/setup'
+      ? setupStep
+        ? `/setup?step=${setupStep}`
+        : '/setup'
       : from === 'join' && target
         ? `/join?repo=${target.owner}/${target.repo}`
         : '/'
@@ -126,6 +130,13 @@ export function FixPage() {
             </li>
           ))}
         </ol>
+
+        {setupStep && (
+          <p className="banner banner-info fix-setup-step">
+            {t('fix.setupStep', { title: t(`onboarding.setup.${setupStep}Title`) })}{' '}
+            <Link to={back}>{t('fix.setupStepLink')}</Link>
+          </p>
+        )}
 
         {forOwner && target && (
           <section className="card help-section">

@@ -18,6 +18,7 @@ import {
   type WorkFields,
 } from './EntryFields'
 import { InlineEdit } from './InlineFields'
+import { usePref } from '../../prefs'
 import { useNow } from './useNow'
 import { useTimerActions } from './useTimerActions'
 
@@ -202,11 +203,12 @@ function ManualEntryView() {
   const save = useSaveEntry()
   const [fields, setFields] = useState<WorkFields>(EMPTY)
   const [times, setTimes] = useState<TimeFields>(defaultTimes)
+  const [timeInput, setTimeInput] = usePref('manualTimeInput')
   const [showErrors, setShowErrors] = useState(false)
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    const r = resolveTimeFields(times)
+    const r = resolveTimeFields({ ...times, useDuration: timeInput === 'duration' })
     if (!r.ok) {
       setShowErrors(true)
       return
@@ -253,8 +255,11 @@ function ManualEntryView() {
         </div>
       </div>
       <TimeInputs
-        value={times}
-        onChange={(p) => setTimes({ ...times, ...p })}
+        value={{ ...times, useDuration: timeInput === 'duration' }}
+        onChange={({ useDuration, ...p }) => {
+          if (useDuration !== undefined) setTimeInput(useDuration ? 'duration' : 'end')
+          setTimes({ ...times, ...p })
+        }}
         showErrors={showErrors}
       />
       <div className="row" style={{ justifyContent: 'flex-end' }}>
@@ -270,7 +275,7 @@ function ManualEntryView() {
 export function TimerBar() {
   const { t } = useI18n()
   const { timer } = useTimerActions()
-  const [mode, setMode] = useState<'timer' | 'manual'>('timer')
+  const [mode, setMode] = usePref('entryMode')
 
   return (
     <section className="card timer-bar">

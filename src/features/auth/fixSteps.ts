@@ -142,6 +142,27 @@ export function fixSteps(t: TFunction, error: LoginError, ctx: FixContext): FixS
   }
 }
 
+/**
+ * The setup wizard step that most likely needs to be redone after a failed sign-in from the
+ * wizard, or null when no step is to blame (offline, rate limit, unknown).
+ */
+export function setupStepFor(error: LoginError): 'repo' | 'token' | null {
+  switch (error) {
+    case 'badRepoFormat':
+    case 'ownerNotFound':
+    case 'repoNotFound':
+      return 'repo'
+    case 'invalidToken':
+    case 'orgRepoNotAccessible':
+    case 'ownRepoNotAccessible':
+    case 'personalRepoNotAccessible':
+    case 'noPushAccess':
+      return 'token'
+    default:
+      return null
+  }
+}
+
 /** Whether an owner may have to act, so the fix page offers the message for the owner. */
 export function needsOwner(error: LoginError, token: TokenKind | null): boolean {
   switch (error) {

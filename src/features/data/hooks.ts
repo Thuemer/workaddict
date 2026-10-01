@@ -165,7 +165,7 @@ export interface MutationFeedback<T> {
   onError?: (error: unknown) => void
 }
 
-export function useSaveEntry() {
+export function useSaveEntry(feedback?: MutationFeedback<void>) {
   const { adapter } = useSessionData()
   const qc = useQueryClient()
   return useMutation({
@@ -176,7 +176,11 @@ export function useSaveEntry() {
       patchEntries(qc, upsert(entry))
       return snap
     },
-    onError: (_e, _v, snap) => restore(qc, snap),
+    onSuccess: () => feedback?.onSuccess?.(undefined),
+    onError: (e, _v, snap) => {
+      restore(qc, snap)
+      feedback?.onError?.(e)
+    },
     onSettled: () => qc.invalidateQueries({ queryKey: keys.entries }),
   })
 }

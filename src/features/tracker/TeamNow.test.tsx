@@ -1,6 +1,6 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { addDays, format, setHours, startOfDay } from 'date-fns'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Member, RunningTimer } from '../../domain/types'
 import '../../i18n'
 import { createMemoryAdapter, MemoryFileStore } from '../../storage'
@@ -13,7 +13,14 @@ const bob = { login: 'bob', avatarUrl: null }
 const carol = { login: 'carol', avatarUrl: null }
 
 function timer(login: string, start: Date, description: string): RunningTimer {
-  return { id: `t-${login}`, login, start: start.toISOString(), description, projectId: null, tagIds: [] }
+  return {
+    id: `t-${login}`,
+    login,
+    start: start.toISOString(),
+    description,
+    projectId: null,
+    tagIds: [],
+  }
 }
 
 function setup(me: Member, timers: RunningTimer[]) {
@@ -73,7 +80,9 @@ describe('team now block', () => {
       fireEvent.change(within(dialog).getByLabelText('Date'), {
         target: { value: format(d, 'yyyy-MM-dd') },
       })
-      fireEvent.change(within(dialog).getByLabelText('End'), { target: { value: format(d, 'HH:mm') } })
+      fireEvent.change(within(dialog).getByLabelText('End'), {
+        target: { value: format(d, 'HH:mm') },
+      })
     }
 
     setEnd(new Date(start.getTime() - 60 * 60_000))
@@ -102,5 +111,53 @@ describe('team now block', () => {
       format(start, 'yyyy-MM-dd'),
     )
     expect((within(dialog).getByLabelText('End') as HTMLInputElement).value).toBe('17:00')
+  })
+})
+
+describe('hiding the team now block', () => {
+  afterEach(() => localStorage.clear())
+
+  it('hides the list and remembers it after a reload', async () => {
+    const { adapter } = setup(alice, [timer('bob', new Date(Date.now() - 60_000), 'Review')])
+    const first = await renderWithSession(<TeamNow />, adapter)
+    await screen.findByText('Review')
+    fireEvent.click(screen.getByRole('button', { name: 'Hide team now' }))
+    expect(screen.queryByText('Review')).toBeNull()
+    first.unmount()
+
+    await renderWithSession(<TeamNow />, adapter)
+    await screen.findByRole('heading', { name: 'Team now' })
+    expect(screen.queryByText('Review')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Show team now' }))
+    expect(await screen.findByText('Review')).toBeInTheDocument()
+  })
+
+  it('still hides for this page view when storage is blocked', async () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blocked')
+    })
+    const { adapter } = setup(alice, [timer('bob', new Date(Date.now() - 60_000), 'Review')])
+    await renderWithSession(<TeamNow />, adapter)
+    await screen.findByText('Review')
+    fireEvent.click(screen.getByRole('button', { name: 'Hide team now' }))
+    expect(screen.queryByText('Review')).toBeNull()
+    vi.restoreAllMocks()
+  })
+})
+
+describe('entry list filter', () => {
+  afterEach(() => localStorage.clear())
+
+  it('remembers "Everyone" after a reload', async () => {
+    const { adapter } = setup(alice, [])
+    const first = await renderWithSession(<TrackerPage />, adapter)
+    fireEvent.click(await screen.findByRole('button', { name: 'Everyone' }))
+    first.unmount()
+
+    await renderWithSession(<TrackerPage />, adapter)
+    expect(await screen.findByRole('button', { name: 'Everyone' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
   })
 })

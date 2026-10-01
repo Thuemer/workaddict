@@ -6,6 +6,7 @@ import {
   formatTime,
   isValidDuration,
   localDateTime,
+  moveToDate,
   parseClockTime,
   parseDuration,
   resolveManualTimes,
@@ -290,5 +291,60 @@ describe('in the Europe/Vienna zone while the process runs on UTC', () => {
     const current = new Date('2026-09-21T19:00:00Z') // 21:00 yesterday in Vienna
     const r = resolveTimerStart(current, '21:15', now, VIENNA)
     expect(r.ok && r.start.toISOString()).toBe('2026-09-21T19:15:00.000Z')
+  })
+})
+
+describe('moveToDate', () => {
+  const VIENNA = 'Europe/Vienna'
+  const iso = (r: ReturnType<typeof moveToDate>) =>
+    r.ok ? [r.start.toISOString(), r.end.toISOString()] : r
+
+  it('keeps the clock times on the new day', () => {
+    const r = moveToDate(
+      new Date('2026-09-21T07:00:00Z'),
+      new Date('2026-09-21T08:00:00Z'),
+      '2026-09-18',
+      VIENNA,
+    )
+    expect(iso(r)).toEqual(['2026-09-18T07:00:00.000Z', '2026-09-18T08:00:00.000Z'])
+  })
+
+  it('keeps an overnight entry overnight', () => {
+    const r = moveToDate(
+      new Date('2026-09-21T21:00:00Z'),
+      new Date('2026-09-21T23:00:00Z'),
+      '2026-09-25',
+      VIENNA,
+    )
+    expect(r).toMatchObject({ ok: true, overnight: true })
+    expect(iso(r)).toEqual(['2026-09-25T21:00:00.000Z', '2026-09-25T23:00:00.000Z'])
+  })
+
+  it('moves across a month boundary', () => {
+    const r = moveToDate(
+      new Date('2026-10-01T07:00:00Z'),
+      new Date('2026-10-01T08:00:00Z'),
+      '2026-09-30',
+      VIENNA,
+    )
+    expect(iso(r)).toEqual(['2026-09-30T07:00:00.000Z', '2026-09-30T08:00:00.000Z'])
+  })
+
+  it('keeps the wall clock across a daylight saving change', () => {
+    // 09:00 in summer time (UTC+2) becomes 09:00 in winter time (UTC+1).
+    const r = moveToDate(
+      new Date('2026-10-23T07:00:00Z'),
+      new Date('2026-10-23T08:00:00Z'),
+      '2026-10-26',
+      VIENNA,
+    )
+    expect(iso(r)).toEqual(['2026-10-26T08:00:00.000Z', '2026-10-26T09:00:00.000Z'])
+  })
+
+  it('rejects text that is not a date', () => {
+    expect(moveToDate(new Date(), new Date(), '', VIENNA)).toEqual({
+      ok: false,
+      error: 'invalidDate',
+    })
   })
 })

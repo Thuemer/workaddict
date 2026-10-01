@@ -11,15 +11,40 @@ export const TEAM_STEPS = ['org', 'repo', 'base', 'approval', 'invite', 'token',
  */
 export const SOLO_STEPS = ['repo', 'token'] as const
 
-/** Every step name the wizard knows, used when reading saved progress. */
-export const SETUP_STEPS = TEAM_STEPS
-export type SetupStep = (typeof TEAM_STEPS)[number]
+/**
+ * Steps of a team whose data repository stays in the owner's personal account. Members are added
+ * as collaborators and need classic tokens, because fine-grained tokens can't reach a repository
+ * where the user is only a collaborator.
+ */
+export const PERSONAL_TEAM_STEPS = ['repo', 'collaborators', 'token', 'share'] as const
 
-/** Whether the data repository belongs to an organization (a team) or to one person. */
-export type SetupMode = 'team' | 'solo'
+/** Every step name the wizard knows, used when reading saved progress. */
+export const SETUP_STEPS = [
+  'org',
+  'repo',
+  'base',
+  'approval',
+  'invite',
+  'collaborators',
+  'token',
+  'share',
+] as const
+export type SetupStep = (typeof SETUP_STEPS)[number]
+
+/**
+ * Who the data repository is for: a team in an organization, one person, or a team on the
+ * owner's personal account.
+ */
+export type SetupMode = 'team' | 'solo' | 'personal-team'
+export const SETUP_MODES: readonly SetupMode[] = ['solo', 'team', 'personal-team']
 
 export function stepsFor(mode: SetupMode): readonly SetupStep[] {
-  return mode === 'solo' ? SOLO_STEPS : TEAM_STEPS
+  return mode === 'solo' ? SOLO_STEPS : mode === 'personal-team' ? PERSONAL_TEAM_STEPS : TEAM_STEPS
+}
+
+/** Whether the data repository belongs to a personal account (no organization). */
+export function isPersonal(mode: SetupMode | null): boolean {
+  return mode === 'solo' || mode === 'personal-team'
 }
 
 export interface SetupState {
@@ -48,7 +73,11 @@ export function loadSetup(): SetupState {
     const org = typeof v.org === 'string' ? v.org : ''
     return {
       // Progress saved before solo mode existed was always a team setup.
-      mode: v.mode === 'solo' || v.mode === 'team' ? v.mode : org !== '' ? 'team' : null,
+      mode: SETUP_MODES.includes(v.mode as SetupMode)
+        ? (v.mode as SetupMode)
+        : org !== ''
+          ? 'team'
+          : null,
       org,
       repo: typeof v.repo === 'string' ? v.repo : DEFAULT_REPO_NAME,
       done: Array.isArray(v.done)

@@ -145,6 +145,8 @@ const en = {
       repoInvitations: 'Email from GitHub, or the repository page → Accept invitation',
       repo: 'github.com/{{repo}}',
       repoAccess: 'Repository → Settings → Collaborators and teams',
+      classicToken:
+        'Profile picture → Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate new token (classic)',
       newToken:
         'Profile picture → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token',
       tokens:
@@ -181,19 +183,45 @@ const en = {
         'Accept the invitation to the GitHub organization {{org}} (email from GitHub, or here: {{link}}).',
       open: 'Then open this link and follow the steps: {{link}}',
       approval: 'When you have created your token, tell me so I can approve it.',
+      acceptRepo:
+        'Accept the invitation to the GitHub repository {{repo}} (email from GitHub, or here: {{link}}).',
+      classic: 'You need a classic GitHub token for this; the link explains why and how.',
     },
     setup: {
       title: 'Set up a team',
       soloTitle: 'Set up your time tracking',
       intro:
-        'About 10 minutes, once. Each step opens the right GitHub page. Tick off what is done; your progress is kept in this browser.',
+        'About 10 minutes, once. One step at a time: each step opens the right GitHub page, then you come back here. Your progress is kept in this browser.',
       soloIntro:
-        'About 3 minutes, once. Each step opens the right GitHub page. Tick off what is done; your progress is kept in this browser.',
+        'About 3 minutes, once. One step at a time: each step opens the right GitHub page, then you come back here. Your progress is kept in this browser.',
+      codeNote:
+        'Workaddict does not use or change your code projects. It stores the time data in its own new, empty repository.',
+      orgNote: 'The organization holds only this one repository. Your code stays where it is.',
       modeTitle: 'Who is this for?',
       modeSolo: 'Just me',
       modeSoloHint: 'A private repository in your own account. Three steps.',
-      modeTeam: 'A team',
-      modeTeamHint: 'A GitHub organization everyone shares. About eight steps.',
+      modeTeam: 'A team with an organization',
+      modeTeamHint: 'Everyone joins a free GitHub organization. Safest tokens. Eight steps.',
+      modePersonalTeam: 'A team on my account',
+      modePersonalTeamHint:
+        'The repository stays in your personal account; members are added as collaborators. Five steps.',
+      compareTitle: 'Which team path fits you?',
+      compareOrg: 'With an organization',
+      compareRecommended: 'Recommended',
+      compareOrgPro1: 'Each member’s token reaches only the time data repository.',
+      compareOrgPro2: 'Members and access are managed in one place.',
+      compareOrgCon1: 'You create a free organization (about a minute).',
+      compareOrgCon2: 'Two more settings: base permission and token approval.',
+      comparePersonal: 'On my account',
+      comparePersonalPro1: 'No organization needed. The repository stays in your account.',
+      comparePersonalPro2: 'Fewer steps for you.',
+      comparePersonalCon1:
+        'Every member needs a classic token. It can read and change all of that member’s repositories, not only the time data.',
+      comparePersonalCon2: 'If such a token leaks, all of the member’s repositories are exposed.',
+      compareBoth:
+        'In both cases your code repositories stay where they are. You can move the time data to an organization later.',
+      pros: 'Pros',
+      cons: 'Cons',
       modeLater:
         'Not sure? Start with "Just me". You can move to an organization later; your data repository can be transferred.',
       org: 'Organization name',
@@ -204,7 +232,28 @@ const en = {
       userInvalid: 'Only letters, digits and single hyphens, up to 39 characters.',
       repo: 'Repository name',
       repoInvalid: 'Only letters, digits, dots, hyphens and underscores.',
-      namesTitle: 'Your GitHub names',
+      namesTitle: 'Your GitHub account',
+      repoLine: 'Data repository: {{repo}}, new and empty',
+      repoChange: 'Change name',
+      repoHint: 'A new name for the time data, not one of your code projects.',
+      repoPublic:
+        '{{repo}} already exists and is public. Workaddict needs a new, empty, private repository. Pick another name.',
+      accountIsUser: '{{name}} is a personal account, not an organization.',
+      accountIsUserOr: 'Or enter the name of a new organization and create it in step 1.',
+      switchToPersonal: 'Set up a team on my account',
+      accountIsOrg: '{{name}} is an organization.',
+      switchToTeam: 'Set up a team with this organization',
+      accountMissing: 'No GitHub account with this name.',
+      orgMissing: 'Not on GitHub yet. Step 1 creates it.',
+      orgFound: 'Found {{org}} on GitHub.',
+      doneNext: 'Done, next step',
+      notDone: 'Not done yet',
+      doneMark: 'Done',
+      doneWhen: 'Done when:',
+      returnTitle: 'Back from GitHub. Did you see this?',
+      returnYes: 'Yes, next step',
+      returnNo: 'No, help me',
+      helpTitle: 'Common mistakes',
       lockedOrg: 'Enter a valid organization name above to open this step.',
       lockedUser: 'Enter a valid GitHub username above to open this step.',
       lockedRepo: 'Fix the repository name above to open this step.',
@@ -212,11 +261,18 @@ const en = {
       reset: 'Start over',
       orgTitle: 'Create a free organization',
       orgText:
-        'Choose the Free plan and name it {{org}}. You can skip adding members for now. Already have an organization? Just tick this off.',
+        'Choose the Free plan and name it {{org}}. You can skip adding members for now. Already have an organization? Mark this step as done.',
+      orgDoneWhen: 'GitHub shows the page of your organization {{org}}.',
+      orgHelp:
+        'Choose the Free plan; you don’t need a paid plan.\nThe name is taken? Pick another one and enter it above.\nGitHub asks whether it belongs to you or a business: either works.',
       orgWhy:
         'Why an organization? Only then can every member use a safe token that reaches nothing but the data repository.',
       orgLink: 'Create an organization',
-      repoTitle: 'Create the private data repository',
+      repoTitle: 'Create a new, empty repository',
+      repoDoneWhen:
+        'GitHub shows the new, empty repository {{org}}/{{repo}} with a “Quick setup” box.',
+      repoHelp:
+        'Owner must be {{org}}, not another account.\nVisibility must be Private.\nLeave README, .gitignore and license off, so the repository stays empty.\nThis is a new repository for the time data, not your code project.',
       repoText:
         'The form is prefilled: owner {{org}}, name {{repo}}, private. Leave README, .gitignore and license off and click “Create repository”.',
       repoLink: 'Create {{org}}/{{repo}}',
@@ -225,13 +281,16 @@ const en = {
       soloTokenText:
         'The token belongs to your own account and needs no approval from anyone. It can only reach this one repository.',
       soloLater:
-        'Working with other people later? Move the repository to a free GitHub organization and run this wizard again as a team. A repository in a personal account cannot be shared with fine-grained tokens.',
+        'Working with other people later? Choose “A team on my account” above, or move the repository to a free GitHub organization. Other people’s fine-grained tokens can’t reach a repository in your personal account.',
       baseTitle: 'Give members write access',
       baseText:
         'Under “Base permissions”, choose Write. Then every member can write to the data repository, and you don’t have to add people one by one.',
       baseCaveat:
         'Write applies to all repositories of {{org}}. Use an organization that holds only the time data.',
       baseLink: 'Open member privileges',
+      baseDoneWhen: '“Base permissions” shows Write and GitHub confirmed the change.',
+      baseHelp:
+        'Only owners of {{org}} see its Settings.\nChoose Write under “Base permissions”, not Read.',
       approvalTitle: 'Decide on token approval',
       approvalText:
         'New organizations require an owner to approve every member’s token. Until then, the member’s sign-in fails. You can turn this off on the “Fine-grained tokens” tab.',
@@ -242,10 +301,25 @@ const en = {
       approvalOnHint:
         'You approve each member’s token under Pending requests. The next steps remind you.',
       approvalLink: 'Open the token policy',
+      approvalDoneWhen: 'You picked an option above and saved the same choice on GitHub.',
+      approvalHelp:
+        'The setting is in the organization’s settings, not in your own profile.\nClick Save at the bottom of the GitHub page.',
       inviteTitle: 'Invite your members',
       inviteText:
         'Invite each person by GitHub username with the role Member. They get an email and have to accept it.',
       inviteLink: 'Open People',
+      inviteDoneWhen:
+        'Every member is listed under People, as a member or with a pending invitation.',
+      inviteHelp:
+        'Use the role Member, not Owner.\nMembers must accept the invitation email before they can join.',
+      collaboratorsTitle: 'Add your members',
+      collaboratorsText:
+        'Click “Add people” and add each member by GitHub username. They get an email and have to accept it.',
+      collaboratorsLink: 'Open collaborators',
+      collaboratorsDoneWhen:
+        'Every member is listed under “Manage access”, with a pending invitation until they accept.',
+      collaboratorsHelp:
+        'GitHub may ask for your password first.\nMembers must accept the invitation email before they can join.',
       cliTitle: 'Faster with the GitHub CLI',
       cliText:
         'Have the GitHub CLI (gh) installed? Enter the usernames and paste the commands into a terminal. They create the repository, set the base permission to Write and invite everyone, so you can tick off steps 2, 3 and 5.',
@@ -254,17 +328,28 @@ const en = {
       cliCopy: 'Copy commands',
       tokenTitle: 'Create your own token',
       tokenText: 'As an owner, your own token needs no approval.',
+      personalTokenText:
+        'The repository is in your account, so your own token can be a fine-grained one that reaches only this repository.',
+      tokenDoneWhen:
+        'GitHub shows your new token once (github_pat_…). Copy it; you paste it in the last step.',
+      tokenHelp:
+        'Resource owner must be {{org}}.\nUnder Repository access, select only {{org}}/{{repo}}.\nPermissions: Contents → Read and write.\nThe token is shown only once. Lost it? Create a new one.',
       shareTitle: 'Invite the team',
       shareText:
         'Send this message to your members. The link guides them through everything in the right order. You can also find it later in Settings.',
       shareLinkLabel: 'Invite link',
+      personalShareText:
+        'Send this message to your members. The repository is in your personal account, so they need a classic token; the link walks them through it.',
+      shareDoneWhen: 'You sent the message to your members.',
+      shareHelp: 'Copy the message above and send it by email or chat.',
       copyLink: 'Copy link',
       copyMessage: 'Copy message',
       shareApproval:
         'You kept approval on: when a member says their token is ready, approve it here.',
       pendingLink: 'Open pending requests',
-      signInTitle: 'Sign in',
-      signInText: 'Paste your token. The first sign-in sets up the empty repository.',
+      signInTitle: 'Check setup and sign in',
+      signInText:
+        'Paste your token. If something is missing, Workaddict tells you which step to redo. The first sign-in sets up the empty repository.',
     },
     join: {
       title: 'Join {{repo}}',
@@ -273,6 +358,18 @@ const en = {
       inviteText: 'You got an email from GitHub. Accept the invitation to {{org}} there or here.',
       inviteLink: 'Open the invitation',
       inviteRepoHint: 'Invited to the repository instead of an organization?',
+      inviteTextRepo:
+        'You got an email from GitHub. Accept the invitation to the repository {{repo}} there or here.',
+      classicIntro:
+        '{{owner}} keeps the repository in a personal account. Fine-grained tokens can’t reach it, so you need a classic token.',
+      classicWarning:
+        'A classic token with the “repo” scope can read and change all of your repositories. Keep it secret and let it expire.',
+      classicNote: 'Note: “Workaddict” is already filled in.',
+      classicExpiry: 'Expiration: 90 days or longer.',
+      classicScope: 'Scopes: “repo” is already ticked. Leave everything else off.',
+      classicGenerate:
+        'Click “Generate token” and copy the token (it starts with ghp_). GitHub shows it only once.',
+      classicOpen: 'Open the classic token form',
       inviteRepoLink: 'Open the repository invitation',
       accessTitle: 'Check your access',
       accessText: 'Open the repository while signed in to GitHub. Can you see it? It may be empty.',
@@ -295,12 +392,17 @@ const en = {
       addTitle: 'Add a member',
       addText: 'Invite them under People with the role Member, or use the GitHub CLI.',
       pendingText: 'If your organization requires token approval, approve new tokens here:',
+      personalText:
+        'New members need an invitation to the repository {{repo}}, then the invite link. It guides them through the rest.',
+      personalAddText: 'Add them under Collaborators in the repository settings.',
     },
   },
   fix: {
     title: 'Sign-in did not work',
     intro: 'Check these one at a time, then try again.',
     back: 'Back to sign-in',
+    setupStep: 'Most likely to redo: the setup step “{{title}}”.',
+    setupStepLink: 'Open this step',
     retry: 'Try again',
     change: 'Change token or repository',
     checkedAgain: 'Checked again at {{time}}. It still does not work.',
@@ -429,6 +531,10 @@ const en = {
   },
   team: {
     title: 'Team now',
+    hide: 'Hide',
+    show: 'Show',
+    showLabel: 'Show team now',
+    hideLabel: 'Hide team now',
     tracking: '{{count}} tracking',
     today: 'Today {{time}}',
     lastActive: 'Last active {{time}}',
@@ -467,6 +573,7 @@ const en = {
       invalidStart: 'Enter a valid date and start time.',
       invalidEnd: 'Enter a valid end time.',
       invalidDuration: 'The duration must be more than 0 and at most 24 hours.',
+      invalidDate: 'Enter a valid date.',
     },
     added: 'Entry added.',
   },
@@ -475,6 +582,7 @@ const en = {
     editStart: 'Edit start time',
     editEnd: 'Edit end time',
     editDuration: 'Edit duration',
+    editDate: 'Edit date',
     today: 'Today',
     yesterday: 'Yesterday',
     me: 'Me',
@@ -488,6 +596,7 @@ const en = {
     deleteConfirm: 'Delete this time entry?',
     deleted: 'Entry deleted.',
     saved: 'Entry saved.',
+    openAgain: 'Open again',
     total: 'Total',
   },
   workGroups: {
@@ -656,7 +765,7 @@ const en = {
     next: 'Continue',
     back: 'Back',
     keyIntro:
-      'Create an API key in Clockify under Profile settings → API → Generate. To import the whole team, use the key of a Clockify workspace admin.',
+      'In Clockify, open your account menu (top right) → Preferences → Advanced tab → Manage API keys → Generate. To import the whole team, use the key of a Clockify workspace admin.',
     keyLabel: 'Clockify API key',
     keyNote: 'The key is used only for this import, is sent only to Clockify and is never saved.',
     region: 'Clockify region',
@@ -717,7 +826,7 @@ const en = {
     doneTitle: 'Import complete',
     done: 'Imported {{entries}} entries, {{projects}} projects and {{tags}} tags.',
     deleteKey:
-      'Now delete the API key in Clockify (Profile settings → API). This app has not stored it.',
+      'Now delete the API key in Clockify (account menu → Preferences → Advanced → Manage API keys). This app has not stored it.',
     errors: {
       invalidKey: 'Clockify API key is not valid.',
       forbidden: 'This key is not allowed to read the Clockify data.',

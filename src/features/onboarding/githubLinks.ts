@@ -47,9 +47,18 @@ export function appLink(path: string, href = window.location.href): string {
   return `${href.split('#')[0]!}#${path}`
 }
 
-/** The app's invite link for a data repository, based on the current page URL. */
-export function inviteLink(owner: string, repo: string, href = window.location.href): string {
-  return appLink(`/join?repo=${seg(owner)}/${seg(repo)}`, href)
+/**
+ * The app's invite link for a data repository, based on the current page URL. `kind: 'user'`
+ * marks a repository in a personal account, whose members join as collaborators.
+ */
+export function inviteLink(
+  owner: string,
+  repo: string,
+  opts: { kind?: 'user' } = {},
+  href = window.location.href,
+): string {
+  const kind = opts.kind ? `&kind=${opts.kind}` : ''
+  return appLink(`/join?repo=${seg(owner)}/${seg(repo)}${kind}`, href)
 }
 
 /**

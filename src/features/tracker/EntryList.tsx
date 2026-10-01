@@ -1,16 +1,22 @@
-import { format, isToday, isYesterday, startOfDay } from '../../domain/zoned'
+import { dateKey, format, isToday, isYesterday, startOfDay } from '../../domain/zoned'
 import { useCallback, useMemo, useState } from 'react'
 import { MemberLabel, ProjectChip } from '../../components/bits'
 import { Icon } from '../../components/Icon'
 import { useConfirm } from '../../components/Modal'
 import { useToast } from '../../components/Toasts'
-import { applyInlineTime, durationMs, formatHM, type InlineTimeField } from '../../domain/time'
+import {
+  applyInlineTime,
+  durationMs,
+  formatHM,
+  moveToDate,
+  type InlineTimeField,
+} from '../../domain/time'
 import type { TimeEntry } from '../../domain/types'
 import { useI18n } from '../../i18n'
 import { useSessionData } from '../auth/AuthContext'
 import { useAccess, useDeleteEntry, useLookups, useSaveEntry } from '../data/hooks'
 import { useErrorText, useErrorToast } from '../data/useErrorText'
-import { EntryEditModal } from './EntryEditModal'
+import { EntryEditModal, type EntryDraft } from './EntryEditModal'
 import { useCreateTag } from './EntryFields'
 import { InlineEdit, InlineProject, InlineTags } from './InlineFields'
 import { useTimerActions } from './useTimerActions'
@@ -35,7 +41,7 @@ export function groupByDay(entries: TimeEntry[]): DayGroup[] {
     .map((g) => ({ ...g, entries: g.entries.sort((a, b) => b.start.localeCompare(a.start)) }))
 }
 
-type InlineField = 'description' | InlineTimeField
+type InlineField = 'description' | 'date' | InlineTimeField
 
 /** The one field being edited inline in the whole list. */
 interface Editing {
@@ -56,7 +62,7 @@ function EntryRow({
   editing: InlineField | null
   setEditing: (field: InlineField, active: boolean) => void
 }) {
-  const { t, time } = useI18n()
+  const { t, time, locale } = useI18n()
   const { user, adapter } = useSessionData()
   const { project, tag, member, workspace } = useLookups()
   const confirm = useConfirm()
@@ -89,6 +95,12 @@ function EntryRow({
     return saveFields({ start: r.start.toISOString(), end: r.end.toISOString() })
   }
 
+  const saveDate = (value: string) => {
+    const r = moveToDate(new Date(entry.start), new Date(entry.end), value)
+    if (!r.ok) return Promise.resolve(t(`manual.errors.${r.error}`))
+    return saveFields({ start: r.start.toISOString(), end: r.end.toISOString() })
+  }
+
   const field = (name: InlineField) => ({
     editable,
     editing: editing === name,
@@ -108,6 +120,15 @@ function EntryRow({
         onCommit={(v) => saveFields({ description: v.trim() })}
       />
       <div className="entry-side">
+        <InlineEdit
+          {...field('date')}
+          type="date"
+          className="entry-date"
+          display={format(new Date(entry.start), 'd MMM', { locale })}
+          initial={dateKey(entry.start)}
+          label={t('entries.editDate')}
+          onCommit={saveDate}
+        />
         <span className="entry-time">
           <InlineEdit
             {...field('start')}
@@ -211,7 +232,11 @@ function EntryRow({
 
 export function EntryList({ entries, showMember }: { entries: TimeEntry[]; showMember: boolean }) {
   const { t, locale } = useI18n()
-  const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null)
+  const toast = useToast()
+  const errorText = useErrorText()
+  const [editingEntry, setEditingEntry] = useState<{ entry: TimeEntry; draft?: EntryDraft } | null>(
+    null,
+  )
   const [inline, setInline] = useState<Editing | null>(null)
   const groups = useMemo(() => groupByDay(entries), [entries])
 
@@ -246,7 +271,7 @@ export function EntryList({ entries, showMember }: { entries: TimeEntry[]; showM
               key={e.id}
               entry={e}
               showMember={showMember}
-              onEdit={setEditingEntry}
+              onEdit={(entry) => setEditingEntry({ entry })}
               editing={inline?.entryId === e.id ? inline.field : null}
               setEditing={setInlineFor(e.id)}
             />
@@ -254,7 +279,18 @@ export function EntryList({ entries, showMember }: { entries: TimeEntry[]; showM
         </section>
       ))}
       {editingEntry && (
-        <EntryEditModal entry={editingEntry} onClose={() => setEditingEntry(null)} />
+        <EntryEditModal
+          key={editingEntry.entry.id}
+          entry={editingEntry.entry}
+          draft={editingEntry.draft}
+          onClose={() => setEditingEntry(null)}
+          onSaveFailed={(draft, error) =>
+            toast.error(errorText(error), {
+              label: t('entries.openAgain'),
+              run: () => setEditingEntry({ entry: editingEntry.entry, draft }),
+            })
+          }
+        />
       )}
     </>
   )

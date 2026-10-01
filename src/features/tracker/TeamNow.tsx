@@ -31,6 +31,7 @@ import {
   useTodayEntries,
 } from '../data/hooks'
 import { useErrorToast } from '../data/useErrorText'
+import { usePref } from '../../prefs'
 import { useNow } from './useNow'
 
 /**
@@ -50,6 +51,7 @@ export function TeamNow() {
   const entries = useTodayEntries().data
   const now = useNow()
   const [stopping, setStopping] = useState<RunningTimer | null>(null)
+  const [hidden, setHidden] = usePref('teamNowHidden')
 
   const rows = useMemo(
     () =>
@@ -89,21 +91,37 @@ export function TeamNow() {
   }
 
   return (
-    <section className="card team-now" aria-labelledby="team-now-title">
+    <section
+      className={`card team-now${hidden === 'yes' ? ' is-collapsed' : ''}`}
+      aria-labelledby="team-now-title"
+    >
       <div className="card-head">
         <h2 id="team-now-title">{t('team.title')}</h2>
         <span className="small muted">{t('team.tracking', { count: tracking })}</span>
+        <button
+          type="button"
+          className="link-btn small team-now-toggle"
+          aria-label={t(hidden === 'yes' ? 'team.showLabel' : 'team.hideLabel')}
+          aria-expanded={hidden !== 'yes'}
+          onClick={() => setHidden(hidden === 'yes' ? 'no' : 'yes')}
+        >
+          {t(hidden === 'yes' ? 'team.show' : 'team.hide')}
+        </button>
       </div>
-      {rows.map((row) => (
-        <TeamNowRow
-          key={row.member.login}
-          row={row}
-          canAct={canAct}
-          onStop={setStopping}
-          onDiscard={(timer) => void onDiscard(timer)}
-        />
-      ))}
-      <p className="small faint team-note">{t('team.note')}</p>
+      {hidden !== 'yes' && (
+        <>
+          {rows.map((row) => (
+            <TeamNowRow
+              key={row.member.login}
+              row={row}
+              canAct={canAct}
+              onStop={setStopping}
+              onDiscard={(timer) => void onDiscard(timer)}
+            />
+          ))}
+          <p className="small faint team-note">{t('team.note')}</p>
+        </>
+      )}
       {stopping && (
         <StopOthersTimerDialog
           timer={stopping}

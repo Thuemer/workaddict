@@ -7,6 +7,7 @@ import { useAccess, useEntries } from '../data/hooks'
 import { EntryList } from './EntryList'
 import { TeamNow } from './TeamNow'
 import { TimerBar } from './TimerBar'
+import { usePref } from '../../prefs'
 import { UtcZoneNotice } from './UtcZoneNotice'
 
 /** Consecutive months without new entries after which "load older" gives up. */
@@ -16,7 +17,7 @@ export function TrackerPage() {
   const { t } = useI18n()
   const { user } = useSessionData()
   const access = useAccess()
-  const [who, setWho] = useState<'me' | 'everyone'>('me')
+  const [who, setWho] = usePref('entryFilter')
   const [months, setMonths] = useState(1)
 
   const range = useMemo(() => {

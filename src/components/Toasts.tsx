@@ -1,15 +1,29 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 import { Icon } from './Icon'
 
 type Kind = 'info' | 'error'
+/** A button in the toast, e.g. to retry; clicking it also closes the toast. */
+export interface ToastAction {
+  label: string
+  run: () => void
+}
 interface Toast {
   id: number
   kind: Kind
   message: string
+  action?: ToastAction
 }
 interface ToastApi {
   info(message: string): void
-  error(message: string): void
+  error(message: string, action?: ToastAction): void
 }
 
 const ToastContext = createContext<ToastApi | null>(null)
@@ -20,15 +34,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const dismiss = useCallback((id: number) => setToasts((l) => l.filter((t) => t.id !== id)), [])
   const push = useCallback(
-    (kind: Kind, message: string) => {
+    (kind: Kind, message: string, action?: ToastAction) => {
       const id = ++nextId.current
-      setToasts((l) => [...l.filter((t) => t.message !== message), { id, kind, message }].slice(-4))
+      setToasts((l) =>
+        [...l.filter((t) => t.message !== message), { id, kind, message, action }].slice(-4),
+      )
       setTimeout(() => dismiss(id), kind === 'error' ? 8000 : 4000)
     },
     [dismiss],
   )
   const api = useMemo<ToastApi>(
-    () => ({ info: (m) => push('info', m), error: (m) => push('error', m) }),
+    () => ({ info: (m) => push('info', m), error: (m, a) => push('error', m, a) }),
     [push],
   )
 
@@ -39,6 +55,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map((t) => (
           <div key={t.id} className={`toast ${t.kind}`}>
             <span>{t.message}</span>
+            {t.action && (
+              <button
+                type="button"
+                className="link-btn toast-action"
+                onClick={() => {
+                  dismiss(t.id)
+                  t.action!.run()
+                }}
+              >
+                {t.action.label}
+              </button>
+            )}
             <button onClick={() => dismiss(t.id)} aria-label="×">
               <Icon name="x" size={16} />
             </button>

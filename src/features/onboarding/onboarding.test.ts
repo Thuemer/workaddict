@@ -89,11 +89,14 @@ describe('githubLinks', () => {
   })
 
   it('builds the invite link from the current page', () => {
-    expect(inviteLink('my-team', 'time-data', 'https://workaddict.me/#/settings')).toBe(
+    expect(inviteLink('my-team', 'time-data', {}, 'https://workaddict.me/#/settings')).toBe(
       'https://workaddict.me/#/join?repo=my-team/time-data',
     )
-    expect(inviteLink('my-team', 'time-data', 'https://x.github.io/app/')).toBe(
+    expect(inviteLink('my-team', 'time-data', {}, 'https://x.github.io/app/')).toBe(
       'https://x.github.io/app/#/join?repo=my-team/time-data',
+    )
+    expect(inviteLink('ben', 'time-data', { kind: 'user' }, 'https://workaddict.me/')).toBe(
+      'https://workaddict.me/#/join?repo=ben/time-data&kind=user',
     )
   })
 })
@@ -219,9 +222,18 @@ describe('setup state', () => {
     expect(loadSetup().mode).toBeNull()
   })
 
+  it('keeps a team on a personal account', () => {
+    localStorage.setItem(
+      'workaddict.setup',
+      '{"mode":"personal-team","org":"ben","repo":"time-data","done":["repo","collaborators"]}',
+    )
+    expect(loadSetup()).toMatchObject({ mode: 'personal-team', done: ['repo', 'collaborators'] })
+  })
+
   it('counts only the steps of the chosen mode', () => {
     expect(stepsFor('solo')).toEqual(['repo', 'token'])
-    expect(stepsFor('team')).toEqual(SETUP_STEPS)
+    expect(stepsFor('team')).toEqual(SETUP_STEPS.filter((s) => s !== 'collaborators'))
+    expect(stepsFor('personal-team')).toEqual(['repo', 'collaborators', 'token', 'share'])
   })
 
   it('works when storage throws', () => {

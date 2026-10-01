@@ -46,15 +46,26 @@ export interface InviteMessageInput {
   org: string
   repo: string
   approvalRequired: boolean
+  /** `user`: the repository is in a personal account, so members join as collaborators. */
+  kind?: 'user'
 }
 
 /** The owner's invitation for new members, in the current language. */
 export function inviteMessage(t: TFunction, m: InviteMessageInput): string {
+  const repo = `${m.org}/${m.repo}`
+  const accept =
+    m.kind === 'user'
+      ? t('onboarding.inviteMsg.acceptRepo', {
+          repo,
+          link: githubLinks.repoInvitations(m.org, m.repo),
+        })
+      : t('onboarding.inviteMsg.accept', { org: m.org, link: githubLinks.orgInvitation(m.org) })
   return [
-    t('onboarding.inviteMsg.intro', { repo: `${m.org}/${m.repo}` }),
+    t('onboarding.inviteMsg.intro', { repo }),
     '',
-    `1. ${t('onboarding.inviteMsg.accept', { org: m.org, link: githubLinks.orgInvitation(m.org) })}`,
+    `1. ${accept}`,
     `2. ${t('onboarding.inviteMsg.open', { link: m.link })}`,
+    ...(m.kind === 'user' ? ['', t('onboarding.inviteMsg.classic')] : []),
     ...(m.approvalRequired ? ['', t('onboarding.inviteMsg.approval')] : []),
   ].join('\n')
 }

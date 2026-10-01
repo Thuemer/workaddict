@@ -154,6 +154,8 @@ const de: Resources = {
       repoInvitations: 'E-Mail von GitHub oder Repository-Seite → Accept invitation',
       repo: 'github.com/{{repo}}',
       repoAccess: 'Repository → Settings → Collaborators and teams',
+      classicToken:
+        'Profilbild → Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate new token (classic)',
       newToken:
         'Profilbild → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token',
       tokens:
@@ -193,19 +195,47 @@ const de: Resources = {
         'Nimm die Einladung in die GitHub-Organisation {{org}} an (E-Mail von GitHub oder hier: {{link}}).',
       open: 'Öffne dann diesen Link und folge den Schritten: {{link}}',
       approval: 'Sag mir Bescheid, wenn du dein Token erstellt hast, damit ich es freigeben kann.',
+      acceptRepo:
+        'Nimm die Einladung zum GitHub-Repository {{repo}} an (E-Mail von GitHub oder hier: {{link}}).',
+      classic: 'Dafür brauchst du ein klassisches GitHub-Token; der Link erklärt, warum und wie.',
     },
     setup: {
       title: 'Team einrichten',
       soloTitle: 'Zeiterfassung einrichten',
       intro:
-        'Etwa 10 Minuten, einmalig. Jeder Schritt öffnet die passende GitHub-Seite. Hake ab, was erledigt ist; dein Fortschritt bleibt in diesem Browser gespeichert.',
+        'Etwa 10 Minuten, einmalig. Ein Schritt nach dem anderen: Jeder Schritt öffnet die passende GitHub-Seite, danach kommst du hierher zurück. Dein Fortschritt bleibt in diesem Browser gespeichert.',
       soloIntro:
-        'Etwa 3 Minuten, einmalig. Jeder Schritt öffnet die passende GitHub-Seite. Hake ab, was erledigt ist; dein Fortschritt bleibt in diesem Browser gespeichert.',
+        'Etwa 3 Minuten, einmalig. Ein Schritt nach dem anderen: Jeder Schritt öffnet die passende GitHub-Seite, danach kommst du hierher zurück. Dein Fortschritt bleibt in diesem Browser gespeichert.',
+      codeNote:
+        'Workaddict verwendet und verändert deine Code-Projekte nicht. Die Zeitdaten liegen in einem eigenen, neuen, leeren Repository.',
+      orgNote: 'Die Organisation enthält nur dieses eine Repository. Dein Code bleibt, wo er ist.',
       modeTitle: 'Für wen ist das?',
       modeSolo: 'Nur für mich',
       modeSoloHint: 'Ein privates Repository in deinem eigenen Konto. Drei Schritte.',
-      modeTeam: 'Für ein Team',
-      modeTeamHint: 'Eine GitHub-Organisation für alle. Etwa acht Schritte.',
+      modeTeam: 'Ein Team mit Organisation',
+      modeTeamHint:
+        'Alle treten einer kostenlosen GitHub-Organisation bei. Die sichersten Tokens. Acht Schritte.',
+      modePersonalTeam: 'Ein Team in meinem Konto',
+      modePersonalTeamHint:
+        'Das Repository bleibt in deinem persönlichen Konto; Mitglieder werden als Collaborators hinzugefügt. Fünf Schritte.',
+      compareTitle: 'Welcher Team-Weg passt zu dir?',
+      compareOrg: 'Mit Organisation',
+      compareRecommended: 'Empfohlen',
+      compareOrgPro1: 'Das Token jedes Mitglieds erreicht nur das Repository mit den Zeitdaten.',
+      compareOrgPro2: 'Mitglieder und Zugriffe verwaltest du an einer Stelle.',
+      compareOrgCon1: 'Du legst eine kostenlose Organisation an (etwa eine Minute).',
+      compareOrgCon2: 'Zwei Einstellungen mehr: Base permission und Token-Freigabe.',
+      comparePersonal: 'In meinem Konto',
+      comparePersonalPro1: 'Keine Organisation nötig. Das Repository bleibt in deinem Konto.',
+      comparePersonalPro2: 'Weniger Schritte für dich.',
+      comparePersonalCon1:
+        'Jedes Mitglied braucht ein klassisches Token. Es kann alle Repositories dieses Mitglieds lesen und ändern, nicht nur die Zeitdaten.',
+      comparePersonalCon2:
+        'Gelangt so ein Token in falsche Hände, sind alle Repositories des Mitglieds offen.',
+      compareBoth:
+        'In beiden Fällen bleiben deine Code-Repositories, wo sie sind. Die Zeitdaten kannst du später in eine Organisation verschieben.',
+      pros: 'Vorteile',
+      cons: 'Nachteile',
       modeLater:
         'Unsicher? Fang mit „Nur für mich“ an. Du kannst später auf eine Organisation umsteigen; das Daten-Repository lässt sich übertragen.',
       org: 'Name der Organisation',
@@ -216,7 +246,29 @@ const de: Resources = {
       userInvalid: 'Nur Buchstaben, Ziffern und einzelne Bindestriche, höchstens 39 Zeichen.',
       repo: 'Name des Repositorys',
       repoInvalid: 'Nur Buchstaben, Ziffern, Punkte, Binde- und Unterstriche.',
-      namesTitle: 'Deine GitHub-Namen',
+      namesTitle: 'Dein GitHub-Konto',
+      repoLine: 'Daten-Repository: {{repo}}, neu und leer',
+      repoChange: 'Namen ändern',
+      repoHint: 'Ein neuer Name für die Zeitdaten, keines deiner Code-Projekte.',
+      repoPublic:
+        '{{repo}} gibt es schon, und es ist öffentlich. Workaddict braucht ein neues, leeres, privates Repository. Wähle einen anderen Namen.',
+      accountIsUser: '{{name}} ist ein persönliches Konto, keine Organisation.',
+      accountIsUserOr:
+        'Oder gib den Namen einer neuen Organisation ein und lege sie in Schritt 1 an.',
+      switchToPersonal: 'Team in meinem Konto einrichten',
+      accountIsOrg: '{{name}} ist eine Organisation.',
+      switchToTeam: 'Team mit dieser Organisation einrichten',
+      accountMissing: 'Es gibt kein GitHub-Konto mit diesem Namen.',
+      orgMissing: 'Noch nicht auf GitHub. Schritt 1 legt sie an.',
+      orgFound: '{{org}} auf GitHub gefunden.',
+      doneNext: 'Erledigt, nächster Schritt',
+      notDone: 'Noch nicht erledigt',
+      doneMark: 'Erledigt',
+      doneWhen: 'Erledigt, wenn:',
+      returnTitle: 'Zurück von GitHub. Hast du das gesehen?',
+      returnYes: 'Ja, nächster Schritt',
+      returnNo: 'Nein, hilf mir',
+      helpTitle: 'Häufige Fehler',
       lockedOrg:
         'Gib oben einen gültigen Namen für die Organisation ein, um diesen Schritt zu öffnen.',
       lockedUser: 'Gib oben einen gültigen GitHub-Benutzernamen ein, um diesen Schritt zu öffnen.',
@@ -225,11 +277,18 @@ const de: Resources = {
       reset: 'Neu beginnen',
       orgTitle: 'Kostenlose Organisation anlegen',
       orgText:
-        'Wähle den Free-Plan und nenne sie {{org}}. Mitglieder hinzufügen kannst du vorerst überspringen. Hast du schon eine Organisation? Dann hake diesen Schritt einfach ab.',
+        'Wähle den Free-Plan und nenne sie {{org}}. Mitglieder hinzufügen kannst du vorerst überspringen. Hast du schon eine Organisation? Dann markiere diesen Schritt als erledigt.',
+      orgDoneWhen: 'GitHub zeigt die Seite deiner Organisation {{org}}.',
+      orgHelp:
+        'Wähle den Free-Plan; ein bezahlter Plan ist nicht nötig.\nDer Name ist vergeben? Wähle einen anderen und gib ihn oben ein.\nGitHub fragt, ob sie dir oder einem Unternehmen gehört: Beides funktioniert.',
       orgWhy:
         'Warum eine Organisation? Nur dann kann jedes Mitglied ein sicheres Token verwenden, das ausschließlich das Daten-Repository erreicht.',
       orgLink: 'Organisation anlegen',
-      repoTitle: 'Privates Daten-Repository anlegen',
+      repoTitle: 'Neues, leeres Repository anlegen',
+      repoDoneWhen:
+        'GitHub zeigt das neue, leere Repository {{org}}/{{repo}} mit dem Kasten „Quick setup“.',
+      repoHelp:
+        'Owner muss {{org}} sein, kein anderes Konto.\nVisibility muss Private sein.\nREADME, .gitignore und Lizenz weglassen, damit das Repository leer bleibt.\nDas ist ein neues Repository für die Zeitdaten, nicht dein Code-Projekt.',
       repoText:
         'Das Formular ist vorausgefüllt: Owner {{org}}, Name {{repo}}, privat. README, .gitignore und Lizenz weglassen und auf „Create repository“ klicken.',
       repoLink: '{{org}}/{{repo}} anlegen',
@@ -238,13 +297,16 @@ const de: Resources = {
       soloTokenText:
         'Das Token gehört zu deinem eigenen Konto und muss von niemandem freigegeben werden. Es erreicht nur dieses eine Repository.',
       soloLater:
-        'Später zu mehreren? Übertrage das Repository in eine kostenlose GitHub-Organisation und durchlaufe diesen Assistenten noch einmal als Team. Ein Repository in einem persönlichen Konto lässt sich nicht mit fein abgestuften Tokens teilen.',
+        'Später zu mehreren? Wähle oben „Ein Team in meinem Konto“ oder übertrage das Repository in eine kostenlose GitHub-Organisation. Fein abgestufte Tokens anderer Personen erreichen kein Repository in deinem persönlichen Konto.',
       baseTitle: 'Mitgliedern Schreibzugriff geben',
       baseText:
         'Unter „Base permissions“ Write wählen. Dann kann jedes Mitglied ins Daten-Repository schreiben, und du musst niemanden einzeln hinzufügen.',
       baseCaveat:
         'Write gilt für alle Repositories von {{org}}. Verwende eine Organisation, die nur die Zeitdaten enthält.',
       baseLink: 'Member privileges öffnen',
+      baseDoneWhen: '„Base permissions“ zeigt Write, und GitHub hat die Änderung bestätigt.',
+      baseHelp:
+        'Nur Owner von {{org}} sehen deren Settings.\nUnter „Base permissions“ Write wählen, nicht Read.',
       approvalTitle: 'Über die Token-Freigabe entscheiden',
       approvalText:
         'Neue Organisationen verlangen, dass ein Owner jedes Token eines Mitglieds freigibt. Bis dahin schlägt die Anmeldung des Mitglieds fehl. Im Reiter „Fine-grained tokens“ kannst du das ausschalten.',
@@ -255,10 +317,25 @@ const de: Resources = {
       approvalOnHint:
         'Du gibst jedes Token unter Pending requests frei. Die nächsten Schritte erinnern dich daran.',
       approvalLink: 'Token-Richtlinie öffnen',
+      approvalDoneWhen:
+        'Du hast oben eine Option gewählt und dieselbe Wahl auf GitHub gespeichert.',
+      approvalHelp:
+        'Die Einstellung liegt in den Settings der Organisation, nicht in deinem eigenen Profil.\nAuf der GitHub-Seite unten auf Save klicken.',
       inviteTitle: 'Mitglieder einladen',
       inviteText:
         'Lade jede Person über ihren GitHub-Benutzernamen mit der Rolle Member ein. Sie bekommt eine E-Mail und muss die Einladung annehmen.',
       inviteLink: 'People öffnen',
+      inviteDoneWhen: 'Jedes Mitglied steht unter People, als Member oder mit offener Einladung.',
+      inviteHelp:
+        'Rolle Member verwenden, nicht Owner.\nMitglieder müssen die Einladungs-E-Mail annehmen, bevor sie beitreten können.',
+      collaboratorsTitle: 'Mitglieder hinzufügen',
+      collaboratorsText:
+        'Auf „Add people“ klicken und jedes Mitglied über seinen GitHub-Benutzernamen hinzufügen. Es bekommt eine E-Mail und muss die Einladung annehmen.',
+      collaboratorsLink: 'Collaborators öffnen',
+      collaboratorsDoneWhen:
+        'Jedes Mitglied steht unter „Manage access“, mit offener Einladung, bis es sie annimmt.',
+      collaboratorsHelp:
+        'GitHub fragt eventuell zuerst nach deinem Passwort.\nMitglieder müssen die Einladungs-E-Mail annehmen, bevor sie beitreten können.',
       cliTitle: 'Schneller mit der GitHub CLI',
       cliText:
         'Ist die GitHub CLI (gh) installiert? Dann gib die Benutzernamen ein und füge die Befehle in ein Terminal ein. Sie legen das Repository an, setzen die Base permission auf Write und laden alle ein. Die Schritte 2, 3 und 5 kannst du dann abhaken.',
@@ -267,17 +344,28 @@ const de: Resources = {
       cliCopy: 'Befehle kopieren',
       tokenTitle: 'Eigenes Token erstellen',
       tokenText: 'Als Owner braucht dein eigenes Token keine Freigabe.',
+      personalTokenText:
+        'Das Repository liegt in deinem Konto, also kann dein eigenes Token ein fein abgestuftes sein, das nur dieses Repository erreicht.',
+      tokenDoneWhen:
+        'GitHub zeigt dein neues Token einmal an (github_pat_…). Kopiere es; du fügst es im letzten Schritt ein.',
+      tokenHelp:
+        'Resource owner muss {{org}} sein.\nUnter Repository access nur {{org}}/{{repo}} auswählen.\nPermissions: Contents → Read and write.\nDas Token wird nur einmal angezeigt. Verloren? Erstelle ein neues.',
       shareTitle: 'Team einladen',
       shareText:
         'Schick diese Nachricht an deine Mitglieder. Der Link führt sie in der richtigen Reihenfolge durch alles. Du findest ihn später auch unter Einstellungen.',
       shareLinkLabel: 'Einladungslink',
+      personalShareText:
+        'Schick diese Nachricht an deine Mitglieder. Das Repository liegt in deinem persönlichen Konto, daher brauchen sie ein klassisches Token; der Link führt sie durch.',
+      shareDoneWhen: 'Du hast die Nachricht an deine Mitglieder geschickt.',
+      shareHelp: 'Kopiere die Nachricht oben und schick sie per E-Mail oder Chat.',
       copyLink: 'Link kopieren',
       copyMessage: 'Nachricht kopieren',
       shareApproval:
         'Du hast die Freigabe beibehalten: Wenn ein Mitglied meldet, dass sein Token fertig ist, gib es hier frei.',
       pendingLink: 'Pending requests öffnen',
-      signInTitle: 'Anmelden',
-      signInText: 'Füge dein Token ein. Die erste Anmeldung richtet das leere Repository ein.',
+      signInTitle: 'Einrichtung prüfen und anmelden',
+      signInText:
+        'Füge dein Token ein. Fehlt etwas, sagt dir Workaddict, welchen Schritt du wiederholen musst. Die erste Anmeldung richtet das leere Repository ein.',
     },
     join: {
       title: '{{repo}} beitreten',
@@ -288,6 +376,18 @@ const de: Resources = {
         'Du hast eine E-Mail von GitHub bekommen. Nimm die Einladung zu {{org}} dort oder hier an.',
       inviteLink: 'Einladung öffnen',
       inviteRepoHint: 'Wurdest du zum Repository statt zu einer Organisation eingeladen?',
+      inviteTextRepo:
+        'Du hast eine E-Mail von GitHub bekommen. Nimm dort oder hier die Einladung zum Repository {{repo}} an.',
+      classicIntro:
+        '{{owner}} hat das Repository in einem persönlichen Konto. Fein abgestufte Tokens erreichen es nicht, daher brauchst du ein klassisches Token.',
+      classicWarning:
+        'Ein klassisches Token mit dem Scope „repo“ kann alle deine Repositories lesen und ändern. Halte es geheim und lass es ablaufen.',
+      classicNote: 'Note: „Workaddict“ ist schon eingetragen.',
+      classicExpiry: 'Expiration: 90 Tage oder länger.',
+      classicScope: 'Scopes: „repo“ ist schon angehakt. Alles andere frei lassen.',
+      classicGenerate:
+        'Auf „Generate token“ klicken und das Token kopieren (es beginnt mit ghp_). GitHub zeigt es nur einmal.',
+      classicOpen: 'Formular für klassische Tokens öffnen',
       inviteRepoLink: 'Repository-Einladung öffnen',
       accessTitle: 'Zugriff prüfen',
       accessText:
@@ -313,12 +413,17 @@ const de: Resources = {
         'Lade die Person unter People mit der Rolle Member ein oder verwende die GitHub CLI.',
       pendingText:
         'Verlangt deine Organisation eine Token-Freigabe, gibst du neue Tokens hier frei:',
+      personalText:
+        'Neue Mitglieder brauchen eine Einladung zum Repository {{repo}} und danach den Einladungslink. Er führt sie durch den Rest.',
+      personalAddText: 'Füge sie in den Repository-Settings unter Collaborators hinzu.',
     },
   },
   fix: {
     title: 'Anmeldung hat nicht geklappt',
     intro: 'Prüfe diese Punkte der Reihe nach und versuche es dann erneut.',
     back: 'Zurück zur Anmeldung',
+    setupStep: 'Wahrscheinlich zu wiederholen: der Einrichtungsschritt „{{title}}“.',
+    setupStepLink: 'Diesen Schritt öffnen',
     retry: 'Erneut versuchen',
     change: 'Token oder Repository ändern',
     checkedAgain: 'Um {{time}} erneut geprüft. Es klappt noch nicht.',
@@ -448,6 +553,10 @@ const de: Resources = {
   },
   team: {
     title: 'Team jetzt',
+    hide: 'Ausblenden',
+    show: 'Einblenden',
+    showLabel: 'Team jetzt einblenden',
+    hideLabel: 'Team jetzt ausblenden',
     tracking: '{{count}} aktiv',
     today: 'Heute {{time}}',
     lastActive: 'Zuletzt aktiv {{time}}',
@@ -487,6 +596,7 @@ const de: Resources = {
       invalidStart: 'Gib ein gültiges Datum und eine gültige Startzeit ein.',
       invalidEnd: 'Gib eine gültige Endzeit ein.',
       invalidDuration: 'Die Dauer muss größer als 0 und höchstens 24 Stunden sein.',
+      invalidDate: 'Gib ein gültiges Datum ein.',
     },
     added: 'Eintrag hinzugefügt.',
   },
@@ -495,6 +605,7 @@ const de: Resources = {
     editStart: 'Startzeit bearbeiten',
     editEnd: 'Endzeit bearbeiten',
     editDuration: 'Dauer bearbeiten',
+    editDate: 'Datum ändern',
     today: 'Heute',
     yesterday: 'Gestern',
     me: 'Ich',
@@ -508,6 +619,7 @@ const de: Resources = {
     deleteConfirm: 'Diesen Zeiteintrag löschen?',
     deleted: 'Eintrag gelöscht.',
     saved: 'Eintrag gespeichert.',
+    openAgain: 'Erneut öffnen',
     total: 'Gesamt',
   },
   workGroups: {
@@ -678,7 +790,7 @@ const de: Resources = {
     next: 'Weiter',
     back: 'Zurück',
     keyIntro:
-      'Erstelle in Clockify unter Profileinstellungen → API → Generieren einen API-Schlüssel. Um das ganze Team zu importieren, verwende den Schlüssel eines Clockify-Workspace-Admins.',
+      'Öffne in Clockify das Kontomenü (oben rechts) → Präferenzen (Preferences) → Tab Erweitert (Advanced) → API-Schlüssel verwalten (Manage API keys) → Generieren. Um das ganze Team zu importieren, verwende den Schlüssel eines Clockify-Workspace-Admins.',
     keyLabel: 'Clockify-API-Schlüssel',
     keyNote:
       'Der Schlüssel wird nur für diesen Import verwendet, nur an Clockify gesendet und nie gespeichert.',
@@ -741,7 +853,7 @@ const de: Resources = {
     doneTitle: 'Import abgeschlossen',
     done: '{{entries}} Einträge, {{projects}} Projekte und {{tags}} Labels importiert.',
     deleteKey:
-      'Lösche jetzt den API-Schlüssel in Clockify (Profileinstellungen → API). Diese App hat ihn nicht gespeichert.',
+      'Lösche jetzt den API-Schlüssel in Clockify (Kontomenü → Präferenzen → Erweitert → API-Schlüssel verwalten). Diese App hat ihn nicht gespeichert.',
     errors: {
       invalidKey: 'Der Clockify-API-Schlüssel ist ungültig.',
       forbidden: 'Dieser Schlüssel darf die Clockify-Daten nicht lesen.',

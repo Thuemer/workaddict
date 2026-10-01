@@ -51,10 +51,27 @@ describe('TeamHelper', () => {
     expect(screen.queryByRole('heading', { name: 'Invite members' })).toBeNull()
   })
 
-  it('is hidden for personal repos and old sessions', async () => {
+  it('gives owners of a personal repo the invite link for collaborators', async () => {
     await renderWithSession(<TeamHelper />, adapterFor(alice), client(), {
       ...orgSession,
+      repo: 'alice/time-data',
       ownerType: 'User',
+    })
+    expect(await screen.findByRole('heading', { name: 'Invite members' })).toBeInTheDocument()
+    expect((screen.getByRole('textbox', { name: 'Copy link' }) as HTMLInputElement).value).toMatch(
+      /#\/join\?repo=alice\/time-data&kind=user$/,
+    )
+    expect(screen.getByRole('link', { name: /Open collaborators/ })).toHaveAttribute(
+      'href',
+      'https://github.com/alice/time-data/settings/access',
+    )
+    expect(screen.queryByRole('link', { name: /Open pending requests/ })).toBeNull()
+  })
+
+  it('is hidden for old sessions without an owner type', async () => {
+    await renderWithSession(<TeamHelper />, adapterFor(alice), client(), {
+      ...orgSession,
+      ownerType: undefined,
     })
     await new Promise((r) => setTimeout(r, 50))
     expect(screen.queryByRole('heading', { name: 'Invite members' })).toBeNull()

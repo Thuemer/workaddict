@@ -18,7 +18,7 @@ interface InlineEditProps {
   /** Saves the value; resolves to an error message to stay in edit mode, or null when saved. */
   onCommit: (value: string) => Promise<string | null>
   className?: string
-  type?: 'text' | 'time'
+  type?: 'text' | 'time' | 'date'
   inputMode?: 'text' | 'decimal'
   placeholder?: string
 }
@@ -75,7 +75,9 @@ export function InlineEdit(p: InlineEditProps) {
         className="input inline-input"
         {...(p.type === 'time'
           ? timeInputAttrs(timeFormat)
-          : { type: 'text', inputMode: p.inputMode, placeholder: p.placeholder })}
+          : p.type === 'date'
+            ? { type: 'date' }
+            : { type: 'text', inputMode: p.inputMode, placeholder: p.placeholder })}
         aria-label={p.label}
         aria-invalid={error !== null}
         value={value}

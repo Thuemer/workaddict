@@ -104,3 +104,23 @@ describe('starting a timer', () => {
     localStorage.clear()
   })
 })
+
+describe('remembered choices', () => {
+  afterEach(() => localStorage.clear())
+
+  it('opens in manual mode with the duration input after a reload', async () => {
+    const adapter = createMemoryAdapter(alice, {
+      store: new MemoryFileStore(),
+      collaborators: [alice],
+      admins: ['alice'],
+    })
+    const first = await renderWithSession(<TimerBar />, adapter)
+    fireEvent.click(screen.getByRole('button', { name: 'Manual' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Enter duration instead' }))
+    first.unmount()
+
+    await renderWithSession(<TimerBar />, adapter)
+    expect(screen.getByRole('button', { name: 'Manual' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Enter end time instead' })).toBeInTheDocument()
+  })
+})

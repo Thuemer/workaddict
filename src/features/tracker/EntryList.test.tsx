@@ -1,8 +1,13 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { TimeEntry } from '../../domain/types'
 import '../../i18n'
-import { createMemoryAdapter, MemoryFileStore, type StorageAdapter } from '../../storage'
+import {
+  createMemoryAdapter,
+  MemoryFileStore,
+  StorageError,
+  type StorageAdapter,
+} from '../../storage'
 import { renderWithSession } from '../../test/renderWithSession'
 import { EntryList } from './EntryList'
 
@@ -29,7 +34,11 @@ async function setup(me: typeof alice, entries: TimeEntry[]) {
   const adapter = createMemoryAdapter(me, { store, collaborators: [alice, bob], admins: ['alice'] })
   await adapter.init()
   // Seed through an owner adapter so any login can be written.
-  const owner = createMemoryAdapter(alice, { store, collaborators: [alice, bob], admins: ['alice'] })
+  const owner = createMemoryAdapter(alice, {
+    store,
+    collaborators: [alice, bob],
+    admins: ['alice'],
+  })
   for (const e of entries) await owner.saveEntry(e)
   await renderWithSession(<EntryList entries={entries} showMember />, adapter)
   return { adapter }
@@ -107,5 +116,86 @@ describe('inline entry editing', () => {
     await waitFor(async () =>
       expect(await stored(adapter)).toMatchObject({ login: 'bob', description: 'Fixed' }),
     )
+  })
+})
+
+describe('edit dialog', () => {
+  const openDialog = () => fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+  const description = () => screen.getByRole('textbox', { name: 'Description' })
+
+  it('closes right after a valid save', async () => {
+    const { adapter } = await setup(bob, [entry('bob')])
+    openDialog()
+    fireEvent.change(description(), { target: { value: 'Planning' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    await waitFor(async () => expect((await stored(adapter)).description).toBe('Planning'))
+  })
+
+  it('stays open with an error for invalid values', async () => {
+    await setup(bob, [entry('bob')])
+    openDialog()
+    fireEvent.change(screen.getByLabelText('End'), { target: { value: 'nope' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('offers to open the dialog again with the typed values when the save fails', async () => {
+    const { adapter } = await setup(bob, [entry('bob')])
+    vi.spyOn(adapter, 'saveEntry').mockRejectedValue(new StorageError('offline'))
+    openDialog()
+    fireEvent.change(description(), { target: { value: 'Planning' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(await screen.findByText('Could not save — you are offline.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Open again' }))
+    expect(description()).toHaveValue('Planning')
+  })
+})
+
+describe('inline date editing', () => {
+  it('moves the entry to another day without a dialog, keeping its times', async () => {
+    const { adapter } = await setup(bob, [entry('bob')])
+    fireEvent.click(screen.getByRole('button', { name: 'Edit date' }))
+    const input = screen.getByLabelText('Edit date')
+    fireEvent.change(input, { target: { value: '2026-09-18' } })
+    await act(async () => {
+      fireEvent.keyDown(input, { key: 'Enter' })
+    })
+    await waitFor(async () =>
+      expect((await stored(adapter)).start).toBe(new Date(2026, 8, 18, 9, 0).toISOString()),
+    )
+    expect((await stored(adapter)).end).toBe(new Date(2026, 8, 18, 10, 0).toISOString())
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('moves the entry into the file of the new month', async () => {
+    const start = new Date(2026, 9, 1, 9, 0)
+    const { adapter } = await setup(bob, [
+      entry('bob', { start: start.toISOString(), end: new Date(2026, 9, 1, 10, 0).toISOString() }),
+    ])
+    fireEvent.click(screen.getByRole('button', { name: 'Edit date' }))
+    const input = screen.getByLabelText('Edit date')
+    fireEvent.change(input, { target: { value: '2026-09-30' } })
+    await act(async () => {
+      fireEvent.blur(input)
+    })
+    await waitFor(async () => {
+      const sept = await adapter.listEntries({
+        from: new Date(2026, 8, 1),
+        to: new Date(2026, 8, 30, 23),
+      })
+      expect(sept.map((e) => e.id)).toEqual(['bob-1'])
+    })
+    const oct = await adapter.listEntries({
+      from: new Date(2026, 9, 1),
+      to: new Date(2026, 9, 31, 23),
+    })
+    expect(oct).toEqual([])
+  })
+
+  it("offers no date control on another member's entry to a worker", async () => {
+    await setup(bob, [entry('alice')])
+    expect(screen.queryByRole('button', { name: 'Edit date' })).toBeNull()
   })
 })

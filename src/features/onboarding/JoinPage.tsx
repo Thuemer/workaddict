@@ -10,17 +10,23 @@ import { SignInForm } from '../auth/SignInForm'
 import { githubLinks, ownerPageLink } from './githubLinks'
 import { ownerMessage } from './messages'
 import { joinTarget } from './names'
-import { GitHubLink, Step, TokenChecklist } from './parts'
+import { ClassicTokenChecklist, GitHubLink, Step, TokenChecklist } from './parts'
 
-/** A logged-out page opened from an invite link: invitation, access check, token, sign-in. */
+/**
+ * A logged-out page opened from an invite link: invitation, access check, token, sign-in.
+ * `&kind=user` marks a repository in a personal account: members are collaborators there and need
+ * a classic token.
+ */
 export function JoinPage() {
   const [params] = useSearchParams()
   const target = joinTarget(params.get('repo'))
   if (!target) return <LoginPage notice="invalidInvite" />
-  return <JoinFlow owner={target.owner} repo={target.repo} />
+  return (
+    <JoinFlow owner={target.owner} repo={target.repo} personal={params.get('kind') === 'user'} />
+  )
 }
 
-function JoinFlow({ owner, repo }: { owner: string; repo: string }) {
+function JoinFlow({ owner, repo, personal }: { owner: string; repo: string; personal: boolean }) {
   const { t } = useI18n()
   const full = `${owner}/${repo}`
   // Back from the fix page: the member already got past the invitation and the access check.
@@ -47,20 +53,39 @@ function JoinFlow({ owner, repo }: { owner: string; repo: string }) {
 
         <ol className="ob-steps">
           <Step n={1} title={t('onboarding.join.inviteTitle')} done={invited} onDone={setInvited}>
-            <p>{t('onboarding.join.inviteText', { org: owner })}</p>
-            <GitHubLink
-              href={githubLinks.orgInvitation(owner)}
-              menu={t('onboarding.menu.orgInvitation')}
-              primary
-            >
-              {t('onboarding.join.inviteLink')}
-            </GitHubLink>
-            <p className="muted small">
-              {t('onboarding.join.inviteRepoHint')}{' '}
-              <a href={githubLinks.repoInvitations(owner, repo)} target="_blank" rel="noreferrer">
-                {t('onboarding.join.inviteRepoLink')} ↗
-              </a>
-            </p>
+            {personal ? (
+              <>
+                <p>{t('onboarding.join.inviteTextRepo', { repo: full })}</p>
+                <GitHubLink
+                  href={githubLinks.repoInvitations(owner, repo)}
+                  menu={t('onboarding.menu.repoInvitations')}
+                  primary
+                >
+                  {t('onboarding.join.inviteLink')}
+                </GitHubLink>
+              </>
+            ) : (
+              <>
+                <p>{t('onboarding.join.inviteText', { org: owner })}</p>
+                <GitHubLink
+                  href={githubLinks.orgInvitation(owner)}
+                  menu={t('onboarding.menu.orgInvitation')}
+                  primary
+                >
+                  {t('onboarding.join.inviteLink')}
+                </GitHubLink>
+                <p className="muted small">
+                  {t('onboarding.join.inviteRepoHint')}{' '}
+                  <a
+                    href={githubLinks.repoInvitations(owner, repo)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {t('onboarding.join.inviteRepoLink')} ↗
+                  </a>
+                </p>
+              </>
+            )}
           </Step>
 
           <Step n={2} title={t('onboarding.join.accessTitle')} done={unlocked}>
@@ -75,7 +100,11 @@ function JoinFlow({ owner, repo }: { owner: string; repo: string }) {
               <div className="banner banner-warning stack" style={{ gap: 8 }} role="alert">
                 <span>{t('onboarding.join.accessMissing')}</span>
                 <CopyText
-                  text={ownerMessage(t, { owner, repo, link: ownerPageLink(owner, repo) })}
+                  text={ownerMessage(t, {
+                    owner,
+                    repo,
+                    link: ownerPageLink(owner, repo, personal ? { kind: 'user' } : {}),
+                  })}
                   label={t('fix.copyOwner')}
                   multiline
                 />
@@ -110,7 +139,11 @@ function JoinFlow({ owner, repo }: { owner: string; repo: string }) {
             locked={!unlocked}
             lockedText={t('onboarding.join.tokenLocked')}
           >
-            <TokenChecklist owner={owner} repo={full} />
+            {personal ? (
+              <ClassicTokenChecklist owner={owner} />
+            ) : (
+              <TokenChecklist owner={owner} repo={full} />
+            )}
           </Step>
 
           <Step

@@ -1,5 +1,14 @@
 import { getZone } from '../timeZone'
-import { addDays, atClockTime, format, fromWallClock, isSameDay, startOfDay } from './zoned'
+import {
+  addDays,
+  atClockTime,
+  differenceInCalendarDays,
+  format,
+  fromDateKey,
+  fromWallClock,
+  isSameDay,
+  startOfDay,
+} from './zoned'
 
 const MINUTE = 60_000
 const HOUR = 60 * MINUTE
@@ -69,7 +78,7 @@ export type ManualTimeInput = {
 
 export type ManualTimeResult =
   | { ok: true; start: Date; end: Date; overnight: boolean }
-  | { ok: false; error: 'invalidStart' | 'invalidEnd' | 'invalidDuration' }
+  | { ok: false; error: 'invalidStart' | 'invalidEnd' | 'invalidDuration' | 'invalidDate' }
 
 /**
  * Resolves manual input into start/end. An end time earlier than (or equal to) the
@@ -175,6 +184,31 @@ export function applyInlineTime(
     if (ms === null) return { ok: false, error: 'invalidDuration' }
     nextEnd = new Date(start.getTime() + ms)
   }
+  if (!isValidDuration(durationMs(nextStart, nextEnd)))
+    return { ok: false, error: 'invalidDuration' }
+  return {
+    ok: true,
+    start: nextStart,
+    end: nextEnd,
+    overnight: !isSameDay(nextStart, nextEnd, zone),
+  }
+}
+
+/**
+ * Moves an entry to another day ("yyyy-MM-dd"), keeping its clock times: start and end move by
+ * the same number of calendar days, so an entry that ends the next day still does.
+ */
+export function moveToDate(
+  start: Date,
+  end: Date,
+  date: string,
+  zone = getZone(),
+): ManualTimeResult {
+  const day = fromDateKey(date, zone)
+  if (!day) return { ok: false, error: 'invalidDate' }
+  const days = differenceInCalendarDays(day, start, zone)
+  const nextStart = addDays(start, days, zone)
+  const nextEnd = addDays(end, days, zone)
   if (!isValidDuration(durationMs(nextStart, nextEnd)))
     return { ok: false, error: 'invalidDuration' }
   return {
