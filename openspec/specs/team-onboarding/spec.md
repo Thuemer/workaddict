@@ -58,7 +58,7 @@ The wizard SHALL ask for the account name once (organization for a team with an 
 
 For a team with an organization the wizard SHALL show these steps in order: create a free organization; create a new, empty private data repository from a link that prefills owner, name and private visibility; set the organization's base repository permission to Write; choose the fine-grained token approval policy; invite members; create the owner's own token; invite the team; check setup and sign in. Each step SHALL have a link to the matching GitHub page personalized with the account and repository names, a short explanation and a fallback menu path.
 
-Until the account name is a valid GitHub login and the repository name is valid, every step including sign-in SHALL be locked: it SHALL show its number and title, the first step SHALL also show one note saying which field to fill in (not repeated on every step), and it SHALL NOT show its explanation, links, choices, commands, copy buttons, sign-in form or done action. Steps already done SHALL stay done while locked and SHALL unlock unchanged once the names are valid again.
+Until the account name is a valid GitHub login and the repository name is valid, the wizard SHALL stay on the name page: its "Next" action SHALL be disabled and no step page SHALL open, also not from a page named in the address. Steps already done SHALL stay done while the names are invalid.
 
 #### Scenario: Code project untouched
 - **WHEN** the user opens the wizard and chooses any path
@@ -78,19 +78,19 @@ Until the account name is a valid GitHub login and the repository name is valid,
 
 #### Scenario: Steps locked before a name
 - **WHEN** the owner has chosen a team path and the name field is empty
-- **THEN** every step is shown locked, the first step notes to enter the name first, and no step offers a done action or GitHub link
+- **THEN** the wizard stays on the name page with "Next" disabled and shows no step's GitHub link
 
 #### Scenario: Invalid organization name
 - **WHEN** the owner enters an organization name that does not match GitHub's login pattern
-- **THEN** the wizard shows a validation message at the field, keeps every step locked, and does not build links from the name
+- **THEN** the wizard shows a validation message at the field, keeps "Next" disabled, and does not build links from the name
 
 #### Scenario: Invalid repository name
 - **WHEN** the owner enters a valid organization name but an invalid repository name
-- **THEN** every step stays locked and the first step notes to fix the repository name
+- **THEN** "Next" stays disabled
 
-#### Scenario: Steps unlock with a valid name
-- **WHEN** the owner enters a valid organization name while the repository name is valid
-- **THEN** all steps unlock and previously done steps are still done
+#### Scenario: Step in the address before a valid name
+- **WHEN** the owner opens `#/setup?step=token` while no valid name is saved
+- **THEN** the wizard shows the name page
 
 #### Scenario: Base permission explained
 - **WHEN** the owner views the base permission step
@@ -194,23 +194,29 @@ All GitHub URLs used for onboarding SHALL be built by one module from the organi
 - **THEN** the step also shows the menu path to reach the same page on GitHub
 
 ### Requirement: One step at a time
-The setup wizard SHALL treat the first step that is not done as the current step and SHALL show only that step expanded. Done steps SHALL be shown collapsed with their title and a done mark, and SHALL offer to reopen them and to mark them as not done. Later steps SHALL show only their number and title in a muted style and SHALL open when their title is clicked. Opening a step other than the current one SHALL NOT be saved.
+The setup wizard SHALL show one page at a time, in this order: who the setup is for, the account name, one page per setup step of the chosen path, and "check setup and sign in". Above the page it SHALL show a progress bar with "Step <n> of <total>" (just "Step 1" before a path is chosen) and a "Start over" action. Below the page content it SHALL offer "Back" (except on the first page) and the main action: "Next" on the first two pages (disabled until a path is chosen or the names are valid), "Done, next step" on a step that is not done (marking it done and opening the next page), and "Next" on a step that is already done, together with "Not done yet". Going back SHALL NOT undo a step. A new page SHALL slide in from the right when moving on and from the left when going back, without animation when the user prefers reduced motion, and focus SHALL move to the page title.
+
+The current page SHALL be kept in the address as `#/setup?step=<page>`, so the browser's back and forward buttons move between pages. Without a page in the address, the wizard SHALL open the first page that still needs work (who it is for, the names, or the first step not done) and SHALL put that page into the address, so that choosing a path or typing a name never changes the page by itself.
 
 #### Scenario: Fresh start
-- **WHEN** the owner has entered valid names and no step is done
-- **THEN** only the first step is expanded and all later steps show only number and title
+- **WHEN** the wizard opens without saved progress
+- **THEN** only the question who it is for is shown, with "Next" disabled and no name field or GitHub link
 
 #### Scenario: Step finished
-- **WHEN** the owner clicks "Done, next step" on the current step
-- **THEN** that step collapses with a done mark, the next step expands, and focus moves to its heading
+- **WHEN** the owner on the organization step clicks "Done, next step"
+- **THEN** the step is marked done, the repository page slides in from the right, and focus moves to its title
 
-#### Scenario: Look ahead
-- **WHEN** the owner clicks the title of a later step
-- **THEN** that step expands without being marked done and without changing which step is current after a reload
+#### Scenario: Back without undoing
+- **WHEN** the owner clicks "Back" on the repository page after finishing the organization step
+- **THEN** the organization page is shown as done with "Next" and "Not done yet"
 
-#### Scenario: Undo a step
-- **WHEN** the owner reopens a done step and chooses "Not done yet"
-- **THEN** the step is no longer done and becomes the current step if it is the first step not done
+#### Scenario: Continue after a reload
+- **WHEN** the owner finished three steps and reopens `#/setup`
+- **THEN** the wizard opens the fourth step's page
+
+#### Scenario: Typing does not move on
+- **WHEN** the owner on the name page enters a valid name
+- **THEN** the name page stays open until the owner clicks "Next"
 
 ### Requirement: Done criteria per step
 Every setup step SHALL state what the user sees on GitHub when the step is done ("Done when …") and SHALL end with a "Done, next step" action that replaces the "Done" checkbox.

@@ -341,152 +341,145 @@ describe('setup wizard', () => {
   afterEach(() => forgetLookups())
 
   const TEAM = 'A team with an organization'
-  /** The wizard asks who it is for first; most of these tests cover the organization path. */
-  const openTeamWizard = (org = 'my-team') => {
+  const click = (name: string | RegExp) => fireEvent.click(screen.getByRole('button', { name }))
+  const next = () => click(/^Next/)
+  const doneNext = () => click(/^Done, next step/)
+  const pageTitle = () => screen.getByRole('heading', { level: 2 })
+  /** Chooses the path and enters the name, ending on the first setup step. */
+  const startWizard = (path: string | RegExp, name: string, label = 'Organization name') => {
     renderAt('/setup')
-    fireEvent.click(screen.getByRole('radio', { name: new RegExp(TEAM) }))
-    if (org)
-      fireEvent.change(screen.getByLabelText('Organization name'), { target: { value: org } })
+    fireEvent.click(screen.getByRole('radio', { name: path }))
+    next()
+    fireEvent.change(screen.getByLabelText(label), { target: { value: name } })
+    next()
   }
-  const doneNext = () => fireEvent.click(screen.getByRole('button', { name: 'Done, next step' }))
-  const openStep = (title: string) => fireEvent.click(screen.getByRole('button', { name: title }))
+  const startTeam = (org = 'my-team') => startWizard(new RegExp(TEAM), org)
 
-  it('says that the code project is not used', () => {
+  it('starts with only the question who it is for', () => {
     renderAt('/setup')
+    expect(pageTitle()).toHaveTextContent('Who is this for?')
     expect(screen.getByText(/does not use or change your code projects/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Next/ })).toBeDisabled()
+    expect(screen.queryByLabelText('Organization name')).toBeNull()
+    expect(screen.queryByRole('link', { name: /Create an organization/ })).toBeNull()
   })
 
-  it('opens one step at a time and moves on with "Done, next step"', async () => {
-    openTeamWizard()
-    expect(screen.getByRole('link', { name: /Create an organization/ })).toBeInTheDocument()
-    // Later steps show only their title.
-    expect(screen.queryByRole('link', { name: /Create my-team\/time-data/ })).toBeNull()
+  it('shows one page per step and moves on with "Done, next step"', async () => {
+    startTeam()
+    expect(pageTitle()).toHaveTextContent('Create a free organization')
+    expect(screen.getByText('Step 3 of 10')).toBeInTheDocument()
     expect(
       screen.getByText(/GitHub shows the page of your organization my-team/),
     ).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Create my-team\/time-data/ })).toBeNull()
 
     doneNext()
+    expect(pageTitle()).toHaveTextContent('Create a new, empty repository')
+    await waitFor(() => expect(pageTitle()).toHaveFocus())
     expect(screen.queryByRole('link', { name: /Create an organization/ })).toBeNull()
-    await waitFor(() =>
-      expect(screen.getByRole('heading', { name: 'Create a new, empty repository' })).toHaveFocus(),
-    )
     expect(screen.getByRole('link', { name: /Create my-team\/time-data/ })).toHaveAttribute(
       'href',
       expect.stringMatching(
         /^https:\/\/github\.com\/new\?owner=my-team&name=time-data&visibility=private/,
       ),
     )
-    expect(screen.getByText('1 of 7 done')).toBeInTheDocument()
   })
 
-  it('opens a later step by its title without marking anything done', () => {
-    openTeamWizard()
-    openStep('Give members write access')
+  it('goes back without undoing a step, and a done step can be undone', () => {
+    startTeam()
+    doneNext()
+    click(/Back/)
+    expect(pageTitle()).toHaveTextContent('Create a free organization')
+    expect(screen.getByText('Done')).toBeInTheDocument()
+    click('Not done yet')
+    expect(screen.getByRole('button', { name: /^Done, next step/ })).toBeInTheDocument()
+  })
+
+  it('walks the organization path through every step to sign-in', () => {
+    startTeam()
+    doneNext()
+    doneNext()
     expect(screen.getByRole('link', { name: /Open member privileges/ })).toHaveAttribute(
       'href',
       'https://github.com/organizations/my-team/settings/member_privileges',
     )
     expect(screen.getByText(/Write applies to all repositories of my-team/)).toBeInTheDocument()
-    openStep('Decide on token approval')
+    doneNext()
     expect(screen.getByRole('link', { name: /Open the token policy/ })).toHaveAttribute(
       'href',
       'https://github.com/organizations/my-team/settings/personal-access-tokens',
     )
-    openStep('Create your own token')
+    doneNext()
+    expect(pageTitle()).toHaveTextContent('Invite your members')
+    doneNext()
     expect(screen.getByRole('link', { name: /Open the token form/ })).toHaveAttribute(
       'href',
       expect.stringContaining('name=Workaddict'),
     )
-    openStep('Check setup and sign in')
-    expect(screen.getByLabelText('Data repository')).toHaveValue('my-team/time-data')
-    expect(screen.getByText('0 of 7 done')).toBeInTheDocument()
-  })
-
-  it('lets a done step be undone', () => {
-    openTeamWizard()
     doneNext()
-    openStep('Create a free organization')
-    fireEvent.click(screen.getByRole('button', { name: 'Not done yet' }))
-    expect(screen.getByText('0 of 7 done')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Create an organization/ })).toBeInTheDocument()
+    expect(pageTitle()).toHaveTextContent('Invite the team')
+    doneNext()
+    expect(pageTitle()).toHaveTextContent('Check setup and sign in')
+    expect(screen.getByLabelText('Data repository')).toHaveValue('my-team/time-data')
   })
 
   it('hides the repository name until the user wants to change it', () => {
-    openTeamWizard()
+    renderAt('/setup')
+    fireEvent.click(screen.getByRole('radio', { name: new RegExp(TEAM) }))
+    next()
+    fireEvent.change(screen.getByLabelText('Organization name'), { target: { value: 'my-team' } })
     expect(
       screen.getByText('Data repository: my-team/time-data, new and empty'),
     ).toBeInTheDocument()
     expect(screen.queryByLabelText('Repository name')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Change name' }))
+    click('Change name')
     expect(screen.getByLabelText('Repository name')).toHaveValue('time-data')
   })
 
-  it('rejects an invalid organization name', () => {
-    openTeamWizard('my team')
+  it('only continues with valid names', () => {
+    renderAt('/setup')
+    fireEvent.click(screen.getByRole('radio', { name: new RegExp(TEAM) }))
+    next()
+    const nextButton = () => screen.getByRole('button', { name: /^Next/ })
+    expect(nextButton()).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('Organization name'), { target: { value: 'my team' } })
     expect(screen.getByText(/Only letters, digits and single hyphens/)).toBeInTheDocument()
-    expect(screen.getAllByText(/Enter a valid organization name above/)).toHaveLength(1)
-    expect(screen.queryByRole('link', { name: /Create an organization/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Done, next step' })).toBeNull()
-  })
-
-  it('locks every step until the names are valid', () => {
-    openTeamWizard('')
-    // An empty name: steps show their titles but nothing to click.
-    expect(screen.getByRole('heading', { name: 'Create a free organization' })).toBeInTheDocument()
-    expect(screen.getAllByText(/Enter a valid organization name above/)).toHaveLength(1)
-    expect(screen.queryByRole('button', { name: 'Done, next step' })).toBeNull()
-    expect(screen.queryByRole('link', { name: /Create an organization/ })).toBeNull()
-    expect(screen.queryByLabelText('Data repository')).toBeNull()
-
+    expect(nextButton()).toBeDisabled()
     fireEvent.change(screen.getByLabelText('Organization name'), { target: { value: 'my-team' } })
-    doneNext()
-
-    // A broken repository name locks everything again, but keeps what was done.
-    fireEvent.click(screen.getByRole('button', { name: 'Change name' }))
+    click('Change name')
     fireEvent.change(screen.getByLabelText('Repository name'), { target: { value: 'bad name' } })
-    expect(screen.getAllByText(/Fix the repository name above/)).toHaveLength(1)
-    expect(screen.queryByRole('button', { name: 'Done, next step' })).toBeNull()
-    expect(screen.getByText('1 of 7 done')).toBeInTheDocument()
-
+    expect(nextButton()).toBeDisabled()
     fireEvent.change(screen.getByLabelText('Repository name'), { target: { value: 'time-data' } })
-    expect(screen.getByRole('link', { name: /Create my-team\/time-data/ })).toBeInTheDocument()
+    expect(nextButton()).toBeEnabled()
   })
 
-  it('keeps the path choice visible and selected', () => {
+  it('does not open a step from the address before the names are valid', () => {
+    localStorage.setItem('workaddict.setup', '{"mode":"team","org":"","repo":"time-data"}')
+    renderAt('/setup?step=token')
+    expect(pageTitle()).toHaveTextContent('Your GitHub account')
+  })
+
+  it('keeps the path choice selected and compares the two team paths', () => {
     renderAt('/setup')
     for (const name of ['Just me', TEAM, 'A team on my account']) {
       expect(screen.getByRole('radio', { name: new RegExp(name) })).not.toBeChecked()
     }
-    expect(screen.queryByLabelText('Organization name')).toBeNull()
-    expect(screen.queryByLabelText('Your GitHub username')).toBeNull()
-
-    fireEvent.click(screen.getByRole('radio', { name: new RegExp(TEAM) }))
-    expect(screen.getByRole('radio', { name: new RegExp(TEAM) })).toBeChecked()
-    expect(screen.getByRole('radio', { name: /Just me/ })).not.toBeChecked()
-    expect(screen.getByLabelText('Organization name')).toBeInTheDocument()
-  })
-
-  it('compares the two team paths honestly', () => {
-    renderAt('/setup')
     fireEvent.click(screen.getByRole('radio', { name: /A team on my account/ }))
+    expect(screen.getByRole('radio', { name: /A team on my account/ })).toBeChecked()
     const compare = screen.getByRole('group', { name: 'Which team path fits you?' })
     expect(within(compare).getByText('Recommended')).toBeInTheDocument()
     expect(compare).toHaveTextContent(/can read and change all of that member’s repositories/)
     expect(compare).toHaveTextContent(/your code repositories stay where they are/)
   })
 
-  it('keeps progress across a reload and reopens at the current step', () => {
-    openTeamWizard()
+  it('continues where the user left off after a reload', () => {
+    startTeam()
     doneNext()
     doneNext()
     doneNext()
-    expect(screen.getByText('3 of 7 done')).toBeInTheDocument()
-
     document.body.innerHTML = ''
     renderAt('/setup')
-    expect(screen.getByLabelText('Organization name')).toHaveValue('my-team')
-    expect(screen.getByText('3 of 7 done')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Open the token policy/ })).toBeInTheDocument()
+    expect(pageTitle()).toHaveTextContent('Decide on token approval')
   })
 
   it('opens the step named in the address', () => {
@@ -500,29 +493,37 @@ describe('setup wizard', () => {
   })
 
   it('mentions approval in the invite only when the owner keeps it on', () => {
-    openTeamWizard()
-    openStep('Decide on token approval')
-    fireEvent.click(screen.getByRole('radio', { name: /Turn approval off/ }))
-    openStep('Invite the team')
+    localStorage.setItem(
+      'workaddict.setup',
+      '{"mode":"team","org":"my-team","repo":"time-data","done":[],"approval":"off"}',
+    )
+    renderAt('/setup?step=share')
     const message = () =>
-      screen.getByRole('textbox', { name: 'Copy message' }) as HTMLTextAreaElement
-    expect(message().value).not.toMatch(/approve/)
+      (screen.getByRole('textbox', { name: 'Copy message' }) as HTMLTextAreaElement).value
+    expect(message()).not.toMatch(/approve/)
     expect(screen.queryByRole('link', { name: /Open pending requests/ })).toBeNull()
+    expect((screen.getByRole('textbox', { name: 'Copy link' }) as HTMLInputElement).value).toMatch(
+      /#\/join\?repo=my-team\/time-data$/,
+    )
 
+    click(/Back/)
+    click(/Back/)
+    click(/Back/)
+    expect(pageTitle()).toHaveTextContent('Decide on token approval')
     fireEvent.click(screen.getByRole('radio', { name: /Keep approval on/ }))
-    expect(message().value).toMatch(/approve/)
+    doneNext()
+    doneNext()
+    doneNext()
+    expect(message()).toMatch(/approve/)
     expect(screen.getByRole('link', { name: /Open pending requests/ })).toHaveAttribute(
       'href',
       'https://github.com/organizations/my-team/settings/personal-access-token-requests',
     )
-    expect((screen.getByRole('textbox', { name: 'Copy link' }) as HTMLInputElement).value).toMatch(
-      /#\/join\?repo=my-team\/time-data$/,
-    )
   })
 
   it('generates GitHub CLI commands for valid usernames only', () => {
-    openTeamWizard()
-    openStep('Invite your members')
+    localStorage.setItem('workaddict.setup', '{"mode":"team","org":"my-team","repo":"time-data"}')
+    renderAt('/setup?step=invite')
     fireEvent.change(screen.getByLabelText(/GitHub usernames/), {
       target: { value: 'anna, ben; x' },
     })
@@ -534,19 +535,9 @@ describe('setup wizard', () => {
   })
 
   it('skips the organization steps when the setup is for one person', () => {
-    renderAt('/setup')
-    fireEvent.click(screen.getByRole('radio', { name: /Just me/ }))
-    fireEvent.change(screen.getByLabelText('Your GitHub username'), {
-      target: { value: 'my-name' },
-    })
-
-    // A private repository in your own account: nothing to share, approve or invite.
-    expect(screen.getByText('0 of 2 done')).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Create a free organization' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Give members write access' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Invite the team' })).toBeNull()
-    expect(screen.queryByLabelText('Organization name')).toBeNull()
-
+    startWizard(/Just me/, 'my-name', 'Your GitHub username')
+    expect(screen.getByText('Step 3 of 5')).toBeInTheDocument()
+    expect(pageTitle()).toHaveTextContent('Create a new, empty repository')
     expect(screen.getByRole('link', { name: /Create my-name\/time-data/ })).toHaveAttribute(
       'href',
       expect.stringMatching(
@@ -554,31 +545,27 @@ describe('setup wizard', () => {
       ),
     )
     doneNext()
-    expect(screen.getByRole('link', { name: /Open the token form/ })).toHaveAttribute(
-      'href',
-      expect.stringContaining('name=Workaddict'),
-    )
+    expect(pageTitle()).toHaveTextContent('Create your own token')
     doneNext()
+    expect(pageTitle()).toHaveTextContent('Check setup and sign in')
     expect(screen.getByLabelText('Data repository')).toHaveValue('my-name/time-data')
     expect(screen.getByText(/Choose “A team on my account” above/)).toBeInTheDocument()
-    // Nothing on the solo path may talk about an organization's pages.
     expect(screen.getByRole('heading', { name: 'Set up your time tracking' })).toBeInTheDocument()
     expect(screen.queryByText(/Organization page/)).toBeNull()
   })
 
   it('sets up a team on a personal account with collaborators and classic tokens', () => {
-    renderAt('/setup')
-    fireEvent.click(screen.getByRole('radio', { name: /A team on my account/ }))
-    fireEvent.change(screen.getByLabelText('Your GitHub username'), { target: { value: 'ben' } })
-    expect(screen.getByText('0 of 4 done')).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Create a free organization' })).toBeNull()
-
+    startWizard(/A team on my account/, 'ben', 'Your GitHub username')
+    expect(screen.getByText('Step 3 of 7')).toBeInTheDocument()
     doneNext()
+    expect(pageTitle()).toHaveTextContent('Add your members')
     expect(screen.getByRole('link', { name: /Open collaborators/ })).toHaveAttribute(
       'href',
       'https://github.com/ben/time-data/settings/access',
     )
-    openStep('Invite the team')
+    doneNext()
+    doneNext()
+    expect(pageTitle()).toHaveTextContent('Invite the team')
     expect((screen.getByRole('textbox', { name: 'Copy link' }) as HTMLInputElement).value).toMatch(
       /#\/join\?repo=ben\/time-data&kind=user$/,
     )
@@ -588,16 +575,17 @@ describe('setup wizard', () => {
     expect(message).toMatch(/classic GitHub token/)
   })
 
-  it('lets the user switch between the solo and team paths', () => {
+  it('keeps the entered name when switching paths', () => {
     renderAt('/setup')
     fireEvent.click(screen.getByRole('radio', { name: /Just me/ }))
+    next()
     fireEvent.change(screen.getByLabelText('Your GitHub username'), {
       target: { value: 'my-name' },
     })
-
+    click(/Back/)
     fireEvent.click(screen.getByRole('radio', { name: new RegExp(TEAM) }))
+    next()
     expect(screen.getByLabelText('Organization name')).toHaveValue('my-name')
-    expect(screen.getByText('0 of 7 done')).toBeInTheDocument()
   })
 
   describe('coming back from GitHub', () => {
@@ -607,65 +595,81 @@ describe('setup wizard', () => {
     }
 
     it('asks whether the step worked and helps when it did not', () => {
-      openTeamWizard()
+      startTeam()
       const link = screen.getByRole('link', { name: /Create an organization/ })
       link.addEventListener('click', (e) => e.preventDefault())
       fireEvent.click(link)
       leaveAndReturn()
       expect(screen.getByText('Back from GitHub. Did you see this?')).toBeInTheDocument()
 
-      fireEvent.click(screen.getByRole('button', { name: 'No, help me' }))
+      click('No, help me')
       expect(screen.getByText('Common mistakes')).toBeInTheDocument()
       expect(
         screen.getByText(/Choose the Free plan; you don’t need a paid plan/),
       ).toBeInTheDocument()
 
-      fireEvent.click(screen.getByRole('button', { name: 'Yes, next step' }))
-      expect(screen.getByText('1 of 7 done')).toBeInTheDocument()
+      click('Yes, next step')
+      expect(pageTitle()).toHaveTextContent('Create a new, empty repository')
     })
 
     it('does not ask after an unrelated tab switch', () => {
-      openTeamWizard()
+      startTeam()
       leaveAndReturn()
       expect(screen.queryByText('Back from GitHub. Did you see this?')).toBeNull()
     })
   })
 
   describe('public account checks', () => {
+    const enterTeamName = (org: string) => {
+      renderAt('/setup')
+      fireEvent.click(screen.getByRole('radio', { name: new RegExp(TEAM) }))
+      next()
+      fireEvent.change(screen.getByLabelText('Organization name'), { target: { value: org } })
+    }
+
     it('ticks off an organization that already exists', async () => {
       stubGitHub({ '/users/my-team': { type: 'Organization' } })
-      openTeamWizard()
-      expect(await screen.findByText('1 of 7 done')).toBeInTheDocument()
-      expect(screen.getByText('Found my-team on GitHub.')).toBeInTheDocument()
+      enterTeamName('my-team')
+      expect(
+        await screen.findByText('Found my-team on GitHub.', {}, { timeout: 3000 }),
+      ).toBeInTheDocument()
+      next()
+      expect(pageTitle()).toHaveTextContent('Create a new, empty repository')
     })
 
     it('offers the personal-account path for a user name on the organization path', async () => {
       stubGitHub({ '/users/ben': { type: 'User' } })
-      openTeamWizard('ben')
+      enterTeamName('ben')
       expect(
-        await screen.findByText('ben is a personal account, not an organization.'),
+        await screen.findByText(
+          'ben is a personal account, not an organization.',
+          {},
+          { timeout: 3000 },
+        ),
       ).toBeInTheDocument()
-      fireEvent.click(screen.getByRole('button', { name: 'Set up a team on my account' }))
-      expect(screen.getByRole('radio', { name: /A team on my account/ })).toBeChecked()
+      click('Set up a team on my account')
       expect(screen.getByLabelText('Your GitHub username')).toHaveValue('ben')
+      click(/Back/)
+      expect(screen.getByRole('radio', { name: /A team on my account/ })).toBeChecked()
     })
 
     it('warns about an existing public repository', async () => {
       stubGitHub({ '/users/ben': { type: 'User' }, '/repos/ben/time-data': { private: false } })
       renderAt('/setup')
       fireEvent.click(screen.getByRole('radio', { name: /Just me/ }))
+      next()
       fireEvent.change(screen.getByLabelText('Your GitHub username'), { target: { value: 'ben' } })
-      expect(await screen.findByRole('alert')).toHaveTextContent(
+      expect(await screen.findByRole('alert', {}, { timeout: 3000 })).toHaveTextContent(
         'ben/time-data already exists and is public.',
       )
     })
 
     it('says nothing when GitHub gives no answer', async () => {
       const fetch = stubGitHub()
-      openTeamWizard()
+      enterTeamName('my-team')
       await waitFor(() => expect(fetch).toHaveBeenCalled())
-      expect(screen.getByText('0 of 7 done')).toBeInTheDocument()
       expect(screen.queryByText(/is a personal account/)).toBeNull()
+      expect(screen.queryByText(/Found my-team/)).toBeNull()
       expect(screen.queryByRole('alert')).toBeNull()
     })
   })

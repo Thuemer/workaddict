@@ -147,142 +147,59 @@ export function GhCommandsField({
   )
 }
 
-export type WizardStepState = 'current' | 'done' | 'later' | 'locked'
-
 /**
- * One step of the setup wizard, shown one at a time: the current step is open, done steps fold to
- * their title, later steps show only their title (both can be opened by clicking it).
+ * The end of a setup step: what the user sees on GitHub when it is done, and, once the user comes
+ * back from a GitHub page opened in this step, the question whether it worked plus common mistakes.
  */
-export function WizardStep({
-  id,
-  n,
-  title,
-  state,
-  open,
-  onToggle,
-  lockedText,
+export function StepCheck({
   doneWhen,
   help,
   returned,
+  done,
   onDone,
-  onUndo,
-  onLinkOpen,
-  onHelp,
-  children,
 }: {
-  id: string
-  n: number
-  title: string
-  state: WizardStepState
-  /** Whether the body is shown; the current step is always open. */
-  open: boolean
-  onToggle: () => void
-  lockedText?: string
-  /** What the user sees on GitHub when the step is done. */
-  doneWhen?: string
+  doneWhen: string
   /** Common mistakes, one per line. */
-  help?: string
+  help: string
   /** The user came back from a GitHub page opened in this step. */
-  returned?: boolean
-  onDone?: () => void
-  onUndo?: () => void
-  /** Called when a link to GitHub inside the step is opened. */
-  onLinkOpen?: () => void
-  /** Called when the user asks for help after coming back from GitHub. */
-  onHelp?: () => void
-  children?: ReactNode
+  returned: boolean
+  done: boolean
+  onDone: () => void
 }) {
   const { t } = useI18n()
   const [showHelp, setShowHelp] = useState(false)
-  const done = state === 'done'
-  const headingId = `ob-step-${id}`
-  const toggleable = state === 'done' || state === 'later'
-  const helpLines = help ? help.split('\n') : []
-
-  const linkOpened = (e: { target: EventTarget }) => {
-    if (e.target instanceof Element && e.target.closest('a[target="_blank"]')) onLinkOpen?.()
-  }
-
+  if (done) return null
   return (
-    <li className={`card ob-step is-${state}${open ? ' is-open' : ''}`} aria-labelledby={headingId}>
-      <div className="ob-step-head">
-        <span className="step-num" aria-hidden="true">
-          {done ? <Icon name="check" size={16} /> : n}
-        </span>
-        <h2 id={headingId} tabIndex={-1}>
-          {toggleable ? (
-            <button
-              type="button"
-              className="ob-step-toggle"
-              aria-expanded={open}
-              onClick={onToggle}
-            >
-              {title}
+    <>
+      {returned ? (
+        <div className="banner banner-info stack ob-return" role="status">
+          <strong>{t('onboarding.setup.returnTitle')}</strong>
+          <span>{doneWhen}</span>
+          <div className="row ob-answers">
+            <button type="button" className="btn btn-sm btn-primary" onClick={onDone}>
+              {t('onboarding.setup.returnYes')}
             </button>
-          ) : (
-            title
-          )}
-        </h2>
-        {done && <span className="small ob-done-mark">{t('onboarding.setup.doneMark')}</span>}
-      </div>
-      {state === 'locked'
-        ? lockedText && <p className="muted">{lockedText}</p>
-        : open && (
-            <div className="ob-step-body" onClick={linkOpened} onAuxClick={linkOpened}>
-              {children}
-              {returned && !done && doneWhen && (
-                <div className="banner banner-info stack ob-return" role="status">
-                  <strong>{t('onboarding.setup.returnTitle')}</strong>
-                  <span>{doneWhen}</span>
-                  <div className="row ob-answers">
-                    <button type="button" className="btn btn-sm btn-primary" onClick={onDone}>
-                      {t('onboarding.setup.returnYes')}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-sm"
-                      onClick={() => {
-                        setShowHelp(true)
-                        onHelp?.()
-                      }}
-                    >
-                      {t('onboarding.setup.returnNo')}
-                    </button>
-                  </div>
-                </div>
-              )}
-              {showHelp && helpLines.length > 0 && (
-                <div className="banner banner-warning stack ob-help" role="note">
-                  <strong>{t('onboarding.setup.helpTitle')}</strong>
-                  <ul className="ob-list">
-                    {helpLines.map((line) => (
-                      <li key={line}>{line}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {doneWhen && !returned && !done && (
-                <p className="small ob-done-when">
-                  <strong>{t('onboarding.setup.doneWhen')}</strong> {doneWhen}
-                </p>
-              )}
-              {onDone && !done && !returned && (
-                <div className="row">
-                  <button type="button" className="btn btn-primary btn-sm" onClick={onDone}>
-                    {t('onboarding.setup.doneNext')}
-                  </button>
-                </div>
-              )}
-              {done && onUndo && (
-                <div className="row">
-                  <button type="button" className="link-btn small" onClick={onUndo}>
-                    {t('onboarding.setup.notDone')}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-    </li>
+            <button type="button" className="btn btn-sm" onClick={() => setShowHelp(true)}>
+              {t('onboarding.setup.returnNo')}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <p className="small ob-done-when">
+          <strong>{t('onboarding.setup.doneWhen')}</strong> {doneWhen}
+        </p>
+      )}
+      {showHelp && (
+        <div className="banner banner-warning stack ob-help" role="note">
+          <strong>{t('onboarding.setup.helpTitle')}</strong>
+          <ul className="ob-list">
+            {help.split('\n').map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </>
   )
 }
 

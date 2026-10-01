@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { CopyText } from '../../components/CopyText'
 import { Icon } from '../../components/Icon'
@@ -9,13 +9,7 @@ import { SignInForm } from '../auth/SignInForm'
 import { DEFAULT_REPO_NAME, ghCommands, githubLinks, inviteLink } from './githubLinks'
 import { inviteMessage } from './messages'
 import { isLogin, isRepoName, parseUsernames } from './names'
-import {
-  GhCommandsField,
-  GitHubLink,
-  TokenChecklist,
-  WizardStep,
-  type WizardStepState,
-} from './parts'
+import { GhCommandsField, GitHubLink, StepCheck, TokenChecklist } from './parts'
 import {
   forgetLookups,
   lookupAccount,
@@ -34,8 +28,8 @@ import {
   type SetupStep,
 } from './setupState'
 
-/** A wizard step, or the final "check setup and sign in" step. */
-type StepId = SetupStep | 'signIn'
+/** One page of the wizard: who it is for, the account name, each setup step, then sign-in. */
+type ScreenId = 'who' | 'account' | SetupStep | 'signIn'
 
 const MODE_LABEL = {
   solo: ['onboarding.setup.modeSolo', 'onboarding.setup.modeSoloHint'],
@@ -43,35 +37,33 @@ const MODE_LABEL = {
   'personal-team': ['onboarding.setup.modePersonalTeam', 'onboarding.setup.modePersonalTeamHint'],
 } as const
 
-function isStepId(value: string | null): value is StepId {
-  return value === 'signIn' || (SETUP_STEPS as readonly string[]).includes(value ?? '')
+function isScreenId(value: string | null): value is ScreenId {
+  return (
+    value === 'who' ||
+    value === 'account' ||
+    value === 'signIn' ||
+    (SETUP_STEPS as readonly string[]).includes(value ?? '')
+  )
 }
 
-/** Moves focus and scroll to a step's heading. */
-function focusStep(id: StepId) {
-  const heading = document.getElementById(`ob-step-${id}`)
-  heading?.focus({ preventScroll: true })
-  heading?.scrollIntoView?.({ block: 'start', behavior: 'smooth' })
+function isStep(screen: ScreenId): screen is SetupStep {
+  return screen !== 'who' && screen !== 'account' && screen !== 'signIn'
 }
 
 /** Waits a moment after typing before asking GitHub, so each keystroke is not a request. */
 const LOOKUP_DELAY_MS = 500
 
 /**
- * The owner's guided setup, one step at a time. A team gets either an organization (safest tokens)
- * or a repository in the owner's personal account (classic tokens for members); one person setting
- * this up for themselves only needs a private repository and a token.
+ * The owner's guided setup as a wizard: one page at a time, moving on with "Next". A team gets
+ * either an organization (safest tokens) or a repository in the owner's personal account (classic
+ * tokens for members); one person only needs a private repository and a token. The page is in the
+ * address (`?step=`), so the browser's back button and the fix page's links work.
  */
 export function SetupPage() {
   const { t } = useI18n()
   const [state, setState] = useSetupState()
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const [users, setUsers] = useState('')
-  // Steps opened besides the current one: by clicking their title, or from the fix page.
-  const [opened, setOpened] = useState<ReadonlySet<StepId>>(() => {
-    const step = params.get('step')
-    return new Set(isStepId(step) ? [step] : [])
-  })
   // The step whose GitHub link was opened, and the step the user came back to.
   const [awaiting, setAwaiting] = useState<SetupStep | null>(null)
   const [returned, setReturned] = useState<SetupStep | null>(null)
@@ -79,8 +71,6 @@ export function SetupPage() {
   const [account, setAccount] = useState<{ name: string; kind: AccountKind } | null>(null)
   const [publicRepo, setPublicRepo] = useState<{ name: string; kind: RepoKind } | null>(null)
   const [recheck, setRecheck] = useState(0)
-  // The step named in the address (from the fix page), focused once on arrival.
-  const [arrivalStep] = useState(() => [...opened][0] ?? null)
   const autoDoneFor = useRef<string | null>(null)
 
   const mode = state.mode
@@ -92,29 +82,53 @@ export function SetupPage() {
   const orgValid = isLogin(org)
   const repoValid = isRepoName(repo)
   const ready = orgValid && repoValid
-  // Every step builds GitHub links from these names, so none opens before both are usable.
-  const locked = !ready
-  const lockedText = t(
-    !orgValid
-      ? personal
-        ? 'onboarding.setup.lockedUser'
-        : 'onboarding.setup.lockedOrg'
-      : 'onboarding.setup.lockedRepo',
-  )
   const names = { org, repo }
   const fullRepo = `${org}/${repo}`
 
   const steps = stepsFor(mode ?? 'team')
   const isDone = (s: SetupStep) => state.done.includes(s)
-  const current: StepId = steps.find((s) => !state.done.includes(s)) ?? 'signIn'
-  const doneCount = state.done.filter((s) => steps.includes(s)).length
+  const firstOpen: ScreenId = steps.find((s) => !state.done.includes(s)) ?? 'signIn'
+  const screens: ScreenId[] = mode === null ? ['who'] : ['who', 'account', ...steps, 'signIn']
   const accountKind: AccountKind = account?.name === org ? account.kind : 'unknown'
   const repoKind: RepoKind = publicRepo?.name === fullRepo ? publicRepo.kind : 'unknown'
 
+  // The page in the address wins; without one, continue where the user left off. Steps need
+  // valid names, so they fall back to the name page until then.
+  const requested = params.get('step')
+  let screen: ScreenId =
+    isScreenId(requested) && screens.includes(requested)
+      ? requested
+      : mode === null
+        ? 'who'
+        : ready
+          ? firstOpen
+          : 'account'
+  if (!ready && screen !== 'who') screen = mode === null ? 'who' : 'account'
+  const index = screens.indexOf(screen)
+
+  // Slide from the right when moving on, from the left when going back (also via browser back).
+  const [shown, setShown] = useState<{ screen: ScreenId; dir: 'next' | 'back' }>({
+    screen,
+    dir: 'next',
+  })
+  if (shown.screen !== screen) {
+    setShown({
+      screen,
+      dir: screens.indexOf(screen) >= screens.indexOf(shown.screen) ? 'next' : 'back',
+    })
+  }
+
+  // Pin the opening page in the address, so choosing a path or typing a name never moves on by
+  // itself; only "Next" and "Back" change the page.
   useEffect(() => {
-    if (arrivalStep) focusStep(arrivalStep)
-    else document.documentElement.scrollTop = 0
-  }, [arrivalStep])
+    if (!isScreenId(requested)) setParams({ step: screen }, { replace: true })
+  }, [requested, screen, setParams])
+
+  // A new page starts at the top with focus on its title, for keyboard and screen reader users.
+  useEffect(() => {
+    document.documentElement.scrollTop = 0
+    document.getElementById('ob-screen-title')?.focus({ preventScroll: true })
+  }, [screen])
 
   // Advice from GitHub's public API: does the account exist, and is it a user or an organization?
   useEffect(() => {
@@ -181,59 +195,408 @@ export function SetupPage() {
     }
   }, [awaiting, org])
 
+  const go = (to: ScreenId) => {
+    setReturned(null)
+    setAwaiting(null)
+    setParams({ step: to })
+  }
+  const next = () => go(screens[index + 1] ?? 'signIn')
+  const back = () => go(screens[index - 1] ?? 'who')
   const markDone = (s: SetupStep) => {
-    const next = steps.find((x) => x !== s && !state.done.includes(x)) ?? 'signIn'
-    // After the re-render that opens the next step.
-    setTimeout(() => focusStep(next))
     setState((prev) => ({
       ...prev,
       done: SETUP_STEPS.filter((x) => x === s || prev.done.includes(x)),
     }))
-    setReturned(null)
-    setOpened(new Set())
+    next()
   }
-  const undo = (s: SetupStep) => {
+  const undo = (s: SetupStep) =>
     setState((prev) => ({ ...prev, done: prev.done.filter((x) => x !== s) }))
-    setOpened(new Set())
-  }
-  const chooseMode = (next: SetupMode) => setState((prev) => ({ ...prev, mode: next }))
+  const chooseMode = (m: SetupMode) => setState((prev) => ({ ...prev, mode: m }))
   const startOver = () => {
     setState(emptySetup())
-    setOpened(new Set())
-    setReturned(null)
-    setAwaiting(null)
     setEditRepo(false)
+    go('who')
   }
-
-  const stepState = (s: StepId): WizardStepState =>
-    locked ? 'locked' : s !== 'signIn' && isDone(s) ? 'done' : s === current ? 'current' : 'later'
-  const stepNo = (s: SetupStep) => steps.indexOf(s) + 1
-  const common = (s: StepId) => ({
-    id: s,
-    state: stepState(s),
-    open: !locked && (s === current || opened.has(s)),
-    onToggle: () =>
-      setOpened((prev) => {
-        const next = new Set(prev)
-        if (!next.delete(s)) next.add(s)
-        return next
-      }),
-    // One note on the first step says what to enter; repeating it on every step is noise.
-    lockedText: s === steps[0] ? lockedText : undefined,
-  })
-  const wizardStep = (s: SetupStep) => ({
-    ...common(s),
-    n: stepNo(s),
-    doneWhen: t(`onboarding.setup.${s}DoneWhen`, names),
-    help: t(`onboarding.setup.${s}Help`, names),
-    returned: returned === s,
-    onDone: () => markDone(s),
-    onUndo: () => undo(s),
-    onLinkOpen: () => setAwaiting(s),
-  })
 
   const parsedUsers = parseUsernames(users)
   const link = ready && !solo ? inviteLink(org, repo, personal ? { kind: 'user' } : {}) : ''
+
+  const title =
+    screen === 'who'
+      ? t('onboarding.setup.modeTitle')
+      : screen === 'account'
+        ? t('onboarding.setup.namesTitle')
+        : t(`onboarding.setup.${screen}Title`)
+
+  /** The setup step's own content; links to GitHub inside it start the "back from GitHub" check. */
+  const stepBody = (s: SetupStep, children: ReactNode) => (
+    <div
+      className="ob-step-body"
+      onClick={(e) => {
+        if (e.target instanceof Element && e.target.closest('a[target="_blank"]')) setAwaiting(s)
+      }}
+    >
+      {children}
+      <StepCheck
+        doneWhen={t(`onboarding.setup.${s}DoneWhen`, names)}
+        help={t(`onboarding.setup.${s}Help`, names)}
+        returned={returned === s}
+        done={isDone(s)}
+        onDone={() => markDone(s)}
+      />
+      {isDone(s) && (
+        <p className="small ob-found">
+          <Icon name="check" size={14} /> {t('onboarding.setup.doneMark')}{' '}
+          <button type="button" className="link-btn small" onClick={() => undo(s)}>
+            {t('onboarding.setup.notDone')}
+          </button>
+        </p>
+      )}
+    </div>
+  )
+
+  const content: Record<ScreenId, () => ReactNode> = {
+    who: () => (
+      <>
+        <div className="ob-modes" role="radiogroup" aria-labelledby="ob-screen-title">
+          {SETUP_MODES.map((m) => (
+            <label key={m} className={`ob-mode${mode === m ? ' is-selected' : ''}`}>
+              <input
+                type="radio"
+                className="visually-hidden"
+                name="setup-mode"
+                value={m}
+                checked={mode === m}
+                onChange={() => chooseMode(m)}
+              />
+              <span className="ob-mode-mark" aria-hidden="true">
+                <Icon name="check" size={14} />
+              </span>
+              <span className="ob-mode-text">
+                <strong>{t(MODE_LABEL[m][0])}</strong>
+                <span className="muted small">{t(MODE_LABEL[m][1])}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+        {mode === null || solo ? (
+          <p className="muted small">{t('onboarding.setup.modeLater')}</p>
+        ) : (
+          <TeamPathComparison />
+        )}
+      </>
+    ),
+    account: () => (
+      <div className="ob-names-fields">
+        <div className="field">
+          <label className="field">
+            <span>{t(personal ? 'onboarding.setup.user' : 'onboarding.setup.org')}</span>
+            <input
+              className="input"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder={personal ? 'my-name' : 'my-team'}
+              value={state.org}
+              aria-invalid={org !== '' && !orgValid}
+              onChange={(e) => setState((prev) => ({ ...prev, org: e.target.value }))}
+            />
+          </label>
+          {org !== '' && !orgValid ? (
+            <p className="small ob-invalid">
+              {t(personal ? 'onboarding.setup.userInvalid' : 'onboarding.setup.orgInvalid')}
+            </p>
+          ) : personal && accountKind === 'missing' ? (
+            <p className="small ob-invalid">{t('onboarding.setup.accountMissing')}</p>
+          ) : (
+            <p className="small muted">
+              {team && accountKind === 'org'
+                ? t('onboarding.setup.orgFound', { org })
+                : team && accountKind === 'missing'
+                  ? t('onboarding.setup.orgMissing')
+                  : t(personal ? 'onboarding.setup.userHint' : 'onboarding.setup.orgHint')}
+            </p>
+          )}
+        </div>
+        {team && accountKind === 'user' && (
+          <div className="banner banner-info stack ob-account-notice" role="status">
+            <span>{t('onboarding.setup.accountIsUser', { name: org })}</span>
+            <div className="row wrap">
+              <button
+                type="button"
+                className="btn btn-sm btn-primary"
+                onClick={() => chooseMode('personal-team')}
+              >
+                {t('onboarding.setup.switchToPersonal')}
+              </button>
+            </div>
+            <span className="small">{t('onboarding.setup.accountIsUserOr')}</span>
+          </div>
+        )}
+        {personal && accountKind === 'org' && (
+          <div className="banner banner-info stack ob-account-notice" role="status">
+            <span>{t('onboarding.setup.accountIsOrg', { name: org })}</span>
+            <div className="row wrap">
+              <button
+                type="button"
+                className="btn btn-sm btn-primary"
+                onClick={() => chooseMode('team')}
+              >
+                {t('onboarding.setup.switchToTeam')}
+              </button>
+            </div>
+          </div>
+        )}
+        {editRepo || !repoValid ? (
+          <div className="field">
+            <label className="field">
+              <span>{t('onboarding.setup.repo')}</span>
+              <input
+                className="input"
+                autoComplete="off"
+                spellCheck={false}
+                value={state.repo}
+                aria-invalid={!repoValid}
+                onChange={(e) => setState((prev) => ({ ...prev, repo: e.target.value }))}
+              />
+            </label>
+            <p className={`small${repoValid ? ' muted' : ' ob-invalid'}`}>
+              {t(repoValid ? 'onboarding.setup.repoHint' : 'onboarding.setup.repoInvalid')}
+            </p>
+          </div>
+        ) : (
+          <p className="ob-repo-line">
+            <span>{t('onboarding.setup.repoLine', { repo: `${org || '…'}/${repo}` })}</span>{' '}
+            <button type="button" className="link-btn small" onClick={() => setEditRepo(true)}>
+              {t('onboarding.setup.repoChange')}
+            </button>
+          </p>
+        )}
+        {repoKind === 'public' && (
+          <div className="banner banner-warning" role="alert">
+            {t('onboarding.setup.repoPublic', { repo: fullRepo })}
+          </div>
+        )}
+        <p className="ob-code-note small">
+          <Icon name="check" size={14} /> {t('onboarding.setup.codeNote')}
+        </p>
+      </div>
+    ),
+    org: () =>
+      stepBody(
+        'org',
+        <>
+          <p>{t('onboarding.setup.orgText', names)}</p>
+          {accountKind === 'org' && (
+            <p className="small ob-found">
+              <Icon name="check" size={14} /> {t('onboarding.setup.orgFound', { org })}
+            </p>
+          )}
+          <p className="muted small">
+            {t('onboarding.setup.orgWhy')} {t('onboarding.setup.orgNote')}
+          </p>
+          <GitHubLink href={githubLinks.createOrg()} menu={t('onboarding.menu.createOrg')} primary>
+            {t('onboarding.setup.orgLink')}
+          </GitHubLink>
+        </>,
+      ),
+    repo: () =>
+      stepBody(
+        'repo',
+        <>
+          <p>
+            {t(personal ? 'onboarding.setup.soloRepoText' : 'onboarding.setup.repoText', names)}
+          </p>
+          <GitHubLink
+            href={githubLinks.newRepo(org, repo)}
+            menu={t(personal ? 'onboarding.menu.newRepoOwn' : 'onboarding.menu.newRepo')}
+            primary
+          >
+            {t('onboarding.setup.repoLink', names)}
+          </GitHubLink>
+        </>,
+      ),
+    base: () =>
+      stepBody(
+        'base',
+        <>
+          <p>{t('onboarding.setup.baseText')}</p>
+          <div className="banner banner-warning" role="note">
+            {t('onboarding.setup.baseCaveat', names)}
+          </div>
+          <GitHubLink
+            href={githubLinks.memberPrivileges(org)}
+            menu={t('onboarding.menu.memberPrivileges')}
+            primary
+          >
+            {t('onboarding.setup.baseLink')}
+          </GitHubLink>
+        </>,
+      ),
+    approval: () =>
+      stepBody(
+        'approval',
+        <>
+          <p>{t('onboarding.setup.approvalText')}</p>
+          <div
+            className="stack"
+            style={{ gap: 8 }}
+            role="radiogroup"
+            aria-label={t('onboarding.setup.approvalTitle')}
+          >
+            <label className="checkbox ob-choice">
+              <input
+                type="radio"
+                name="approval"
+                checked={state.approval === 'off'}
+                onChange={() => setState((prev) => ({ ...prev, approval: 'off' }))}
+              />
+              <span>
+                <strong>{t('onboarding.setup.approvalOff')}</strong>
+                <br />
+                <span className="muted small">{t('onboarding.setup.approvalOffHint')}</span>
+              </span>
+            </label>
+            <label className="checkbox ob-choice">
+              <input
+                type="radio"
+                name="approval"
+                checked={state.approval === 'on'}
+                onChange={() => setState((prev) => ({ ...prev, approval: 'on' }))}
+              />
+              <span>
+                <strong>{t('onboarding.setup.approvalOn')}</strong>
+                <br />
+                <span className="muted small">{t('onboarding.setup.approvalOnHint')}</span>
+              </span>
+            </label>
+          </div>
+          <GitHubLink
+            href={githubLinks.tokenPolicy(org)}
+            menu={t('onboarding.menu.tokenPolicy')}
+            primary
+          >
+            {t('onboarding.setup.approvalLink')}
+          </GitHubLink>
+        </>,
+      ),
+    invite: () =>
+      stepBody(
+        'invite',
+        <>
+          <p>{t('onboarding.setup.inviteText')}</p>
+          <GitHubLink href={githubLinks.people(org)} menu={t('onboarding.menu.people')} primary>
+            {t('onboarding.setup.inviteLink')}
+          </GitHubLink>
+          <details className="ob-cli">
+            <summary>{t('onboarding.setup.cliTitle')}</summary>
+            <p>{t('onboarding.setup.cliText')}</p>
+            <GhCommandsField
+              users={users}
+              onUsers={setUsers}
+              invalid={parsedUsers.invalid}
+              commands={ghCommands(org, parsedUsers.valid, { repo })}
+            />
+          </details>
+        </>,
+      ),
+    collaborators: () =>
+      stepBody(
+        'collaborators',
+        <>
+          <p>{t('onboarding.setup.collaboratorsText')}</p>
+          <GitHubLink
+            href={githubLinks.repoAccess(org, repo)}
+            menu={t('onboarding.menu.repoAccess')}
+            primary
+          >
+            {t('onboarding.setup.collaboratorsLink')}
+          </GitHubLink>
+        </>,
+      ),
+    token: () =>
+      stepBody(
+        'token',
+        <>
+          <p>
+            {t(
+              solo
+                ? 'onboarding.setup.soloTokenText'
+                : personal
+                  ? 'onboarding.setup.personalTokenText'
+                  : 'onboarding.setup.tokenText',
+            )}
+          </p>
+          <TokenChecklist owner={org} repo={fullRepo} />
+        </>,
+      ),
+    share: () =>
+      stepBody(
+        'share',
+        <>
+          <p>{t(personal ? 'onboarding.setup.personalShareText' : 'onboarding.setup.shareText')}</p>
+          <CopyText text={link} label={t('onboarding.setup.copyLink')} visible />
+          <CopyText
+            text={inviteMessage(t, {
+              link,
+              org,
+              repo,
+              approvalRequired: team && state.approval === 'on',
+              kind: personal ? 'user' : undefined,
+            })}
+            label={t('onboarding.setup.copyMessage')}
+            visible
+            multiline
+          />
+          {team && state.approval === 'on' && (
+            <div className="banner banner-info stack" style={{ gap: 6 }}>
+              <span>{t('onboarding.setup.shareApproval')}</span>
+              <GitHubLink
+                href={githubLinks.pendingTokens(org)}
+                menu={t('onboarding.menu.pendingTokens')}
+              >
+                {t('onboarding.setup.pendingLink')}
+              </GitHubLink>
+            </div>
+          )}
+        </>,
+      ),
+    signIn: () => (
+      <div className="ob-step-body">
+        <p>{t('onboarding.setup.signInText')}</p>
+        <SignInForm key={fullRepo} from="setup" initialRepo={fullRepo} />
+        {solo && <p className="muted small">{t('onboarding.setup.soloLater')}</p>}
+      </div>
+    ),
+  }
+
+  // The main button: choose and continue, mark a step done, or just continue past a done step.
+  const primary =
+    screen === 'who' ? (
+      <button type="button" className="btn btn-primary" disabled={mode === null} onClick={next}>
+        {t('onboarding.setup.next')} →
+      </button>
+    ) : screen === 'account' ? (
+      <button
+        type="button"
+        className="btn btn-primary"
+        disabled={!ready}
+        onClick={() => go(firstOpen)}
+      >
+        {t('onboarding.setup.next')} →
+      </button>
+    ) : isStep(screen) ? (
+      isDone(screen) ? (
+        <button type="button" className="btn btn-primary" onClick={next}>
+          {t('onboarding.setup.next')} →
+        </button>
+      ) : (
+        returned !== screen && (
+          <button type="button" className="btn btn-primary" onClick={() => markDone(screen)}>
+            {t('onboarding.setup.doneNext')} →
+          </button>
+        )
+      )
+    ) : null
 
   return (
     <div className="landing">
@@ -244,361 +607,57 @@ export function SetupPage() {
         </Link>
         <div className="stack" style={{ gap: 6 }}>
           <h1>{t(solo ? 'onboarding.setup.soloTitle' : 'onboarding.setup.title')}</h1>
-          <p className="muted">
-            {t(solo ? 'onboarding.setup.soloIntro' : 'onboarding.setup.intro')}
-          </p>
-          <p className="ob-code-note">
-            <Icon name="check" size={14} /> {t('onboarding.setup.codeNote')}
-          </p>
+          {screen === 'who' && (
+            <>
+              <p className="muted">
+                {t(solo ? 'onboarding.setup.soloIntro' : 'onboarding.setup.intro')}
+              </p>
+              <p className="ob-code-note">
+                <Icon name="check" size={14} /> {t('onboarding.setup.codeNote')}
+              </p>
+            </>
+          )}
         </div>
 
-        <section className="card ob-mode-card">
-          <h2 className="h3" id="ob-mode-title">
-            {t('onboarding.setup.modeTitle')}
-          </h2>
-          <div className="ob-modes" role="radiogroup" aria-labelledby="ob-mode-title">
-            {SETUP_MODES.map((m) => (
-              <label key={m} className={`ob-mode${mode === m ? ' is-selected' : ''}`}>
-                <input
-                  type="radio"
-                  className="visually-hidden"
-                  name="setup-mode"
-                  value={m}
-                  checked={mode === m}
-                  onChange={() => chooseMode(m)}
-                />
-                <span className="ob-mode-mark" aria-hidden="true">
-                  <Icon name="check" size={14} />
-                </span>
-                <span className="ob-mode-text">
-                  <strong>{t(MODE_LABEL[m][0])}</strong>
-                  <span className="muted small">{t(MODE_LABEL[m][1])}</span>
-                </span>
-              </label>
-            ))}
-          </div>
-          {mode === null || solo ? (
-            <p className="muted small">{t('onboarding.setup.modeLater')}</p>
-          ) : (
-            <TeamPathComparison />
+        <div className="ob-wizard-head">
+          <span className="small muted" role="status">
+            {mode === null
+              ? t('onboarding.setup.stepFirst')
+              : t('onboarding.setup.stepOf', { n: index + 1, total: screens.length })}
+          </span>
+          {mode !== null && (
+            <button type="button" className="link-btn small" onClick={startOver}>
+              {t('onboarding.setup.reset')}
+            </button>
           )}
+          <progress
+            className="ob-progress"
+            value={mode === null ? 0 : index + 1}
+            max={screens.length}
+            aria-hidden="true"
+          />
+        </div>
+
+        <section
+          key={screen}
+          className={`card ob-screen slide-${shown.dir}`}
+          aria-labelledby="ob-screen-title"
+        >
+          <h2 id="ob-screen-title" className="ob-screen-title" tabIndex={-1}>
+            {title}
+          </h2>
+          {content[screen]()}
+          <div className="ob-nav">
+            {index > 0 ? (
+              <button type="button" className="btn" onClick={back}>
+                ← {t('onboarding.setup.back')}
+              </button>
+            ) : (
+              <span />
+            )}
+            {primary}
+          </div>
         </section>
-
-        {mode !== null && (
-          <>
-            <section className="card ob-names">
-              <h2 className="h3">{t('onboarding.setup.namesTitle')}</h2>
-              <div className="ob-names-fields">
-                <div className="field">
-                  <label className="field">
-                    <span>{t(personal ? 'onboarding.setup.user' : 'onboarding.setup.org')}</span>
-                    <input
-                      className="input"
-                      autoComplete="off"
-                      spellCheck={false}
-                      placeholder={personal ? 'my-name' : 'my-team'}
-                      value={state.org}
-                      aria-invalid={org !== '' && !orgValid}
-                      onChange={(e) => setState((prev) => ({ ...prev, org: e.target.value }))}
-                    />
-                  </label>
-                  {org !== '' && !orgValid ? (
-                    <p className="small ob-invalid">
-                      {t(personal ? 'onboarding.setup.userInvalid' : 'onboarding.setup.orgInvalid')}
-                    </p>
-                  ) : personal && accountKind === 'missing' ? (
-                    <p className="small ob-invalid">{t('onboarding.setup.accountMissing')}</p>
-                  ) : (
-                    <p className="small muted">
-                      {team && accountKind === 'org'
-                        ? t('onboarding.setup.orgFound', { org })
-                        : team && accountKind === 'missing'
-                          ? t('onboarding.setup.orgMissing')
-                          : t(personal ? 'onboarding.setup.userHint' : 'onboarding.setup.orgHint')}
-                    </p>
-                  )}
-                </div>
-                {team && accountKind === 'user' && (
-                  <div className="banner banner-info stack ob-account-notice" role="status">
-                    <span>{t('onboarding.setup.accountIsUser', { name: org })}</span>
-                    <div className="row wrap">
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-primary"
-                        onClick={() => chooseMode('personal-team')}
-                      >
-                        {t('onboarding.setup.switchToPersonal')}
-                      </button>
-                    </div>
-                    <span className="small">{t('onboarding.setup.accountIsUserOr')}</span>
-                  </div>
-                )}
-                {personal && accountKind === 'org' && (
-                  <div className="banner banner-info stack ob-account-notice" role="status">
-                    <span>{t('onboarding.setup.accountIsOrg', { name: org })}</span>
-                    <div className="row wrap">
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-primary"
-                        onClick={() => chooseMode('team')}
-                      >
-                        {t('onboarding.setup.switchToTeam')}
-                      </button>
-                    </div>
-                  </div>
-                )}
-                {editRepo || !repoValid ? (
-                  <div className="field">
-                    <label className="field">
-                      <span>{t('onboarding.setup.repo')}</span>
-                      <input
-                        className="input"
-                        autoComplete="off"
-                        spellCheck={false}
-                        value={state.repo}
-                        aria-invalid={!repoValid}
-                        onChange={(e) => setState((prev) => ({ ...prev, repo: e.target.value }))}
-                      />
-                    </label>
-                    <p className={`small${repoValid ? ' muted' : ' ob-invalid'}`}>
-                      {t(repoValid ? 'onboarding.setup.repoHint' : 'onboarding.setup.repoInvalid')}
-                    </p>
-                  </div>
-                ) : (
-                  <p className="ob-repo-line">
-                    <span>{t('onboarding.setup.repoLine', { repo: `${org || '…'}/${repo}` })}</span>{' '}
-                    <button
-                      type="button"
-                      className="link-btn small"
-                      onClick={() => setEditRepo(true)}
-                    >
-                      {t('onboarding.setup.repoChange')}
-                    </button>
-                  </p>
-                )}
-                {repoKind === 'public' && (
-                  <div className="banner banner-warning" role="alert">
-                    {t('onboarding.setup.repoPublic', { repo: fullRepo })}
-                  </div>
-                )}
-              </div>
-              <div className="ob-names-foot">
-                <progress
-                  className="ob-progress"
-                  value={doneCount}
-                  max={steps.length}
-                  aria-labelledby="ob-progress-label"
-                />
-                <span id="ob-progress-label" className="muted small" role="status">
-                  {t('onboarding.setup.progress', { done: doneCount, total: steps.length })}
-                </span>
-                <span className="spacer" />
-                <button type="button" className="link-btn small" onClick={startOver}>
-                  {t('onboarding.setup.reset')}
-                </button>
-              </div>
-            </section>
-
-            <ol className="ob-steps">
-              {team && (
-                <WizardStep {...wizardStep('org')} title={t('onboarding.setup.orgTitle')}>
-                  <p>{t('onboarding.setup.orgText', names)}</p>
-                  {accountKind === 'org' && (
-                    <p className="small ob-found">
-                      <Icon name="check" size={14} /> {t('onboarding.setup.orgFound', { org })}
-                    </p>
-                  )}
-                  <p className="muted small">
-                    {t('onboarding.setup.orgWhy')} {t('onboarding.setup.orgNote')}
-                  </p>
-                  <GitHubLink
-                    href={githubLinks.createOrg()}
-                    menu={t('onboarding.menu.createOrg')}
-                    primary
-                  >
-                    {t('onboarding.setup.orgLink')}
-                  </GitHubLink>
-                </WizardStep>
-              )}
-
-              <WizardStep {...wizardStep('repo')} title={t('onboarding.setup.repoTitle')}>
-                <p>
-                  {t(
-                    personal ? 'onboarding.setup.soloRepoText' : 'onboarding.setup.repoText',
-                    names,
-                  )}
-                </p>
-                <GitHubLink
-                  href={githubLinks.newRepo(org, repo)}
-                  menu={t(personal ? 'onboarding.menu.newRepoOwn' : 'onboarding.menu.newRepo')}
-                  primary
-                >
-                  {t('onboarding.setup.repoLink', names)}
-                </GitHubLink>
-              </WizardStep>
-
-              {team && (
-                <WizardStep {...wizardStep('base')} title={t('onboarding.setup.baseTitle')}>
-                  <p>{t('onboarding.setup.baseText')}</p>
-                  <div className="banner banner-warning" role="note">
-                    {t('onboarding.setup.baseCaveat', names)}
-                  </div>
-                  <GitHubLink
-                    href={githubLinks.memberPrivileges(org)}
-                    menu={t('onboarding.menu.memberPrivileges')}
-                    primary
-                  >
-                    {t('onboarding.setup.baseLink')}
-                  </GitHubLink>
-                </WizardStep>
-              )}
-
-              {team && (
-                <WizardStep {...wizardStep('approval')} title={t('onboarding.setup.approvalTitle')}>
-                  <p>{t('onboarding.setup.approvalText')}</p>
-                  <div
-                    className="stack"
-                    style={{ gap: 8 }}
-                    role="radiogroup"
-                    aria-label={t('onboarding.setup.approvalTitle')}
-                  >
-                    <label className="checkbox ob-choice">
-                      <input
-                        type="radio"
-                        name="approval"
-                        checked={state.approval === 'off'}
-                        onChange={() => setState((prev) => ({ ...prev, approval: 'off' }))}
-                      />
-                      <span>
-                        <strong>{t('onboarding.setup.approvalOff')}</strong>
-                        <br />
-                        <span className="muted small">{t('onboarding.setup.approvalOffHint')}</span>
-                      </span>
-                    </label>
-                    <label className="checkbox ob-choice">
-                      <input
-                        type="radio"
-                        name="approval"
-                        checked={state.approval === 'on'}
-                        onChange={() => setState((prev) => ({ ...prev, approval: 'on' }))}
-                      />
-                      <span>
-                        <strong>{t('onboarding.setup.approvalOn')}</strong>
-                        <br />
-                        <span className="muted small">{t('onboarding.setup.approvalOnHint')}</span>
-                      </span>
-                    </label>
-                  </div>
-                  <GitHubLink
-                    href={githubLinks.tokenPolicy(org)}
-                    menu={t('onboarding.menu.tokenPolicy')}
-                    primary
-                  >
-                    {t('onboarding.setup.approvalLink')}
-                  </GitHubLink>
-                </WizardStep>
-              )}
-
-              {team && (
-                <WizardStep {...wizardStep('invite')} title={t('onboarding.setup.inviteTitle')}>
-                  <p>{t('onboarding.setup.inviteText')}</p>
-                  <GitHubLink
-                    href={githubLinks.people(org)}
-                    menu={t('onboarding.menu.people')}
-                    primary
-                  >
-                    {t('onboarding.setup.inviteLink')}
-                  </GitHubLink>
-                  <details className="ob-cli">
-                    <summary>{t('onboarding.setup.cliTitle')}</summary>
-                    <p>{t('onboarding.setup.cliText')}</p>
-                    <GhCommandsField
-                      users={users}
-                      onUsers={setUsers}
-                      invalid={parsedUsers.invalid}
-                      commands={ghCommands(org, parsedUsers.valid, { repo })}
-                    />
-                  </details>
-                </WizardStep>
-              )}
-
-              {mode === 'personal-team' && (
-                <WizardStep
-                  {...wizardStep('collaborators')}
-                  title={t('onboarding.setup.collaboratorsTitle')}
-                >
-                  <p>{t('onboarding.setup.collaboratorsText')}</p>
-                  <GitHubLink
-                    href={githubLinks.repoAccess(org, repo)}
-                    menu={t('onboarding.menu.repoAccess')}
-                    primary
-                  >
-                    {t('onboarding.setup.collaboratorsLink')}
-                  </GitHubLink>
-                </WizardStep>
-              )}
-
-              <WizardStep {...wizardStep('token')} title={t('onboarding.setup.tokenTitle')}>
-                <p>
-                  {t(
-                    solo
-                      ? 'onboarding.setup.soloTokenText'
-                      : personal
-                        ? 'onboarding.setup.personalTokenText'
-                        : 'onboarding.setup.tokenText',
-                  )}
-                </p>
-                <TokenChecklist owner={org} repo={fullRepo} />
-              </WizardStep>
-
-              {!solo && (
-                <WizardStep {...wizardStep('share')} title={t('onboarding.setup.shareTitle')}>
-                  <p>
-                    {t(
-                      personal
-                        ? 'onboarding.setup.personalShareText'
-                        : 'onboarding.setup.shareText',
-                    )}
-                  </p>
-                  <CopyText text={link} label={t('onboarding.setup.copyLink')} visible />
-                  <CopyText
-                    text={inviteMessage(t, {
-                      link,
-                      org,
-                      repo,
-                      approvalRequired: team && state.approval === 'on',
-                      kind: personal ? 'user' : undefined,
-                    })}
-                    label={t('onboarding.setup.copyMessage')}
-                    visible
-                    multiline
-                  />
-                  {team && state.approval === 'on' && (
-                    <div className="banner banner-info stack" style={{ gap: 6 }}>
-                      <span>{t('onboarding.setup.shareApproval')}</span>
-                      <GitHubLink
-                        href={githubLinks.pendingTokens(org)}
-                        menu={t('onboarding.menu.pendingTokens')}
-                      >
-                        {t('onboarding.setup.pendingLink')}
-                      </GitHubLink>
-                    </div>
-                  )}
-                </WizardStep>
-              )}
-
-              <WizardStep
-                {...common('signIn')}
-                n={steps.length + 1}
-                title={t('onboarding.setup.signInTitle')}
-              >
-                <p>{t('onboarding.setup.signInText')}</p>
-                <SignInForm key={fullRepo} from="setup" initialRepo={fullRepo} />
-                {solo && <p className="muted small">{t('onboarding.setup.soloLater')}</p>}
-              </WizardStep>
-            </ol>
-          </>
-        )}
       </main>
       <SiteFooter />
     </div>
