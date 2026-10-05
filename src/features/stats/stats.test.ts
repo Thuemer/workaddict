@@ -1,4 +1,5 @@
 import type { TimeEntry, Workspace } from '../../domain/types'
+import { setDeviceZone } from '../../timeZone'
 import {
   allTimeRange,
   byMember,
@@ -62,10 +63,27 @@ describe('presetRange', () => {
     expect(r.from).toEqual(new Date(2026, 8, 21))
     expect(presetRange('lastWeek', now).from).toEqual(new Date(2026, 8, 14))
   })
-  it('last 2 weeks covers last week and this week', () => {
-    const r = presetRange('lastTwoWeeks', new Date(2026, 9, 5, 10, 0)) // Monday 2026-10-05
-    expect(r.from).toEqual(new Date(2026, 8, 28))
-    expect(r.to).toEqual(new Date(2026, 9, 11, 23, 59, 59, 999))
+  it('last 14 days covers the 14 days ending today', () => {
+    const monday = new Date(2026, 9, 5, 10, 0) // Monday 2026-10-05
+    const r = presetRange('lastTwoWeeks', monday)
+    expect(r.from).toEqual(new Date(2026, 8, 22))
+    expect(r.to).toEqual(new Date(2026, 9, 5, 23, 59, 59, 999))
+    // "Last week" stays a calendar week.
+    expect(presetRange('lastWeek', monday)).toEqual({
+      from: new Date(2026, 8, 28),
+      to: new Date(2026, 9, 4, 23, 59, 59, 999),
+    })
+  })
+  it('last 14 days spans 14 calendar days across the DST change', () => {
+    setDeviceZone('Europe/Vienna')
+    try {
+      // Monday 2 November 2026, 10:00 in Vienna; DST ended on 25 October.
+      const r = presetRange('lastTwoWeeks', new Date('2026-11-02T09:00:00Z'))
+      expect(r.from).toEqual(new Date('2026-10-19T22:00:00Z')) // 20 October 00:00 CEST
+      expect(r.to).toEqual(new Date('2026-11-02T22:59:59.999Z')) // 2 November 23:59:59.999 CET
+    } finally {
+      setDeviceZone(null)
+    }
   })
 })
 

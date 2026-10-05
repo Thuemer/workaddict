@@ -250,6 +250,48 @@ export function runAdapterContract(name: string, setup: ContractSetup) {
       })
     })
 
+    describe("other members' entries", () => {
+      it('lets a team leader add an entry for a member and records who added it', async () => {
+        const saved = await alice.saveEntry(
+          entry('bob', '2026-09-22T09:00:00Z', '2026-09-22T11:30:00Z'),
+        )
+        expect(saved).toMatchObject({ login: 'bob', addedBy: 'alice' })
+        expect(await bob.listAllEntries()).toEqual([saved])
+      })
+
+      it('refuses a worker adding an entry for another member and writes nothing', async () => {
+        await expect(
+          bob.saveEntry(entry('alice', '2026-09-22T09:00:00Z', '2026-09-22T10:00:00Z')),
+        ).rejects.toSatisfy((x: unknown) => isStorageError(x, 'forbiddenRole'))
+        expect(await alice.listAllEntries()).toHaveLength(0)
+      })
+
+      it('keeps addedBy when the owner edits or moves the entry, and ignores client values', async () => {
+        const e = await alice.saveEntry(
+          entry('bob', '2026-09-30T09:00:00Z', '2026-09-30T10:00:00Z'),
+        )
+        const moved = await bob.saveEntry(
+          {
+            ...e,
+            description: 'Renamed',
+            start: '2026-10-01T09:00:00Z',
+            end: '2026-10-01T10:00:00Z',
+            addedBy: 'bob',
+          },
+          e.start,
+        )
+        expect(moved).toMatchObject({ description: 'Renamed', addedBy: 'alice' })
+        expect(await bob.listAllEntries()).toEqual([moved])
+      })
+
+      it('records no adder on own entries, even when the client sends one', async () => {
+        const saved = await bob.saveEntry(
+          entry('bob', '2026-09-22T09:00:00Z', '2026-09-22T10:00:00Z', { addedBy: 'alice' }),
+        )
+        expect(saved.addedBy).toBeUndefined()
+      })
+    })
+
     it('keeps workspace changes from several members', async () => {
       await alice.setRole('bob', 'editor')
       await alice.updateWorkspace(

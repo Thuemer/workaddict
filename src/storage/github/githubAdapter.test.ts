@@ -200,6 +200,8 @@ describe('GitHub adapter specifics', () => {
     const alices = (await b.listAllEntries())[0]!
     await b.deleteEntry(alices)
     expect(messages.at(-1)).toBe('entry: delete "Fix login" for alice (bob)')
+    await b.saveEntry({ ...alices, id: '2', description: 'Missed call' })
+    expect(messages.at(-1)).toBe('entry: add 2:00 "Missed call" for alice (bob)')
     expect(gh.json('roles.json')).toEqual({ roles: { bob: 'editor' } })
 
     const { timer } = await a.startTimer(

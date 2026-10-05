@@ -8,7 +8,7 @@ import { formatClock, resolveTimerStart } from '../../domain/time'
 import type { RunningTimer } from '../../domain/types'
 import { useI18n } from '../../i18n'
 import { useSessionData } from '../auth/AuthContext'
-import { useDiscardTimer, useSaveEntry, useUpdateTimer } from '../data/hooks'
+import { useAccess, useDiscardTimer, useMembers, useSaveEntry, useUpdateTimer } from '../data/hooks'
 import { useErrorText, useErrorToast } from '../data/useErrorText'
 import {
   GroupPickers,
@@ -202,19 +202,52 @@ function defaultTimes(): TimeFields {
   }
 }
 
+/** "For" picker: whose entry the manual form creates. Only for users who may edit others' entries. */
+function MemberPicker({ value, onChange }: { value: string; onChange: (login: string) => void }) {
+  const { t } = useI18n()
+  const { user } = useSessionData()
+  const members = useMembers().data ?? []
+  const others = members
+    .map((m) => m.login)
+    .filter((l) => l !== user.login)
+    .sort((a, b) => a.localeCompare(b))
+  return (
+    <label className="row small" style={{ marginRight: 'auto' }}>
+      <span>{t('manual.for')}</span>
+      <select className="select" value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value={user.login}>{t('manual.me', { login: user.login })}</option>
+        {others.map((l) => (
+          <option key={l} value={l}>
+            {l}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
 /**
  * Manual entry form. With a running timer it shows that timer, ending when the form opened,
- * and saving stops the timer with the edited values.
+ * and saving stops the timer with the edited values. `timer` is null when the entry is for
+ * another member, so their entry never touches the user's own timer.
  */
 function ManualEntryView({
   draft: fields,
   setDraft: setFields,
   timer,
-}: DraftProps & { timer: RunningTimer | null }) {
+  forLogin,
+  setForLogin,
+}: DraftProps & {
+  timer: RunningTimer | null
+  forLogin: string
+  setForLogin: (login: string) => void
+}) {
   const { t, timeFormat } = useI18n()
   const toast = useToast()
   const onError = useErrorToast()
-  const { user } = useSessionData()
+  const { adapter, user } = useSessionData()
+  const access = useAccess()
+  const forOther = forLogin !== user.login
   const save = useSaveEntry()
   const update = useUpdateTimer()
   const { stopTimerAt, busy } = useTimerActions()
@@ -275,7 +308,7 @@ function ManualEntryView({
       {
         entry: {
           id: newId(),
-          login: user.login,
+          login: forLogin,
           start: r.start.toISOString(),
           end: r.end.toISOString(),
           ...fields,
@@ -287,8 +320,10 @@ function ManualEntryView({
       {
         // Inputs are only cleared once the entry is safely stored.
         onSuccess: () => {
-          toast.info(t('manual.added'))
-          setFields(EMPTY)
+          toast.info(forOther ? t('manual.addedFor', { login: forLogin }) : t('manual.added'))
+          // Skip the no-op: React would keep it queued and could later replay it over the
+          // draft filled from the running timer when switching back to the user's own entry.
+          if (fields !== EMPTY) setFields(EMPTY)
           setTimes((prev) => ({ ...defaultTimes(), date: prev.date }))
           setShowErrors(false)
         },
@@ -321,6 +356,9 @@ function ManualEntryView({
         resolved={resolved}
       />
       <div className="row" style={{ justifyContent: 'flex-end' }}>
+        {!adapter.readOnly && access.can('editOthersEntries') && (
+          <MemberPicker value={forLogin} onChange={setForLogin} />
+        )}
         {timer ? (
           <>
             <span className="small muted">{t('manual.runningHint')}</span>
@@ -335,7 +373,7 @@ function ManualEntryView({
         ) : (
           <button className="btn btn-primary" disabled={save.isPending}>
             <Icon name="plus" size={16} />
-            {t('manual.add')}
+            {forOther ? t('manual.addFor', { login: forLogin }) : t('manual.add')}
           </button>
         )}
       </div>
@@ -360,13 +398,18 @@ function changedFields(base: WorkFields, next: WorkFields): Partial<WorkFields> 
 
 export function TimerBar() {
   const { t } = useI18n()
-  const { timer } = useTimerActions()
+  const { user } = useSessionData()
+  const { timer: ownTimer } = useTimerActions()
   const onError = useErrorToast()
   const update = useUpdateTimer()
   const [mode, setMode] = usePref('entryMode')
   const [draft, setDraft] = useState<WorkFields>(EMPTY)
   // The running timer the manual form was filled from, and its values at that point.
   const [seed, setSeed] = useState<{ id: string; fields: WorkFields } | null>(null)
+  // Whose entry the manual form creates; kept across saves, reset when leaving manual mode.
+  const [forLogin, setForLogin] = useState(user.login)
+  // An entry for another member ignores the user's own running timer.
+  const timer = mode === 'manual' && forLogin !== user.login ? null : ownTimer
 
   if (mode === 'manual' && timer) {
     const remote = workFieldsOf(timer)
@@ -397,6 +440,7 @@ export function TimerBar() {
       setDraft(EMPTY)
     }
     setSeed(null)
+    setForLogin(user.login)
     setMode(next)
   }
 
@@ -422,6 +466,8 @@ export function TimerBar() {
           draft={draft}
           setDraft={setDraft}
           timer={timer}
+          forLogin={forLogin}
+          setForLogin={setForLogin}
         />
       ) : timer ? (
         <RunningTimerView key={timer.id} timer={timer} />

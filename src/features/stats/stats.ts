@@ -54,8 +54,9 @@ export function presetRange(preset: DatePreset, now = new Date()): DateRange {
       const d = addWeeks(now, -1)
       return { from: startOfWeek(d), to: endOfWeek(d) }
     }
+    // Labeled "Last 14 days": the 14 days ending today. The key stays so remembered filters keep working.
     case 'lastTwoWeeks':
-      return { from: startOfWeek(addWeeks(now, -1)), to: endOfWeek(now) }
+      return { from: startOfDay(addDays(now, -13)), to: endOfDay(now) }
     case 'thisMonth':
       return { from: startOfMonth(now), to: endOfMonth(now) }
     case 'lastMonth': {

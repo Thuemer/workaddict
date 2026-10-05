@@ -199,3 +199,13 @@ describe('inline date editing', () => {
     expect(screen.queryByRole('button', { name: 'Edit date' })).toBeNull()
   })
 })
+
+describe('entries added by another member', () => {
+  it('marks entries added for their owner by someone else', async () => {
+    await setup(bob, [
+      entry('bob', { id: 'added', description: 'Client call', addedBy: 'alice' }),
+      entry('bob', { id: 'own', description: 'Standup' }),
+    ])
+    expect(screen.getAllByText('added by alice')).toHaveLength(1)
+  })
+})

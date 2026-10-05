@@ -225,6 +225,9 @@ function EntryRow({
           </>
         )}
         {showMember && <MemberLabel member={member(entry.login)} />}
+        {entry.addedBy && entry.addedBy !== entry.login && (
+          <span className="small muted">{t('entries.addedBy', { login: entry.addedBy })}</span>
+        )}
       </div>
     </div>
   )

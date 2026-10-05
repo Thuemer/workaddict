@@ -90,7 +90,8 @@ export function isTimeEntry(value: unknown, login: string | null = null): value 
     // Bookkeeping only (compared as strings to pick the newest copy), so any string is accepted.
     isString(value.createdAt) &&
     isString(value.updatedAt) &&
-    (value.stoppedBy === undefined || isLogin(value.stoppedBy))
+    (value.stoppedBy === undefined || isLogin(value.stoppedBy)) &&
+    (value.addedBy === undefined || isLogin(value.addedBy))
   )
 }
 

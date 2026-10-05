@@ -1,4 +1,5 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
+import { QueryClient } from '@tanstack/react-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { RunningTimer } from '../../domain/types'
 import '../../i18n'
@@ -245,6 +246,82 @@ describe('switching between timer and manual mode', () => {
     const entries = await adapter.listAllEntries()
     expect(entries).toHaveLength(1)
     expect(entries[0]?.end).toBe(at(10).toISOString())
+  })
+})
+
+describe('manual entries for other members', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    localStorage.clear()
+  })
+
+  const bob = { login: 'bob', avatarUrl: null }
+  const desc = () => screen.getByLabelText('What are you working on?') as HTMLInputElement
+  const picker = () => screen.getByLabelText('For') as HTMLSelectElement
+
+  async function setupAs(user: typeof alice, timer?: RunningTimer) {
+    const adapter = createMemoryAdapter(user, {
+      store: new MemoryFileStore(timer ? { [`timers/${timer.login}.json`]: timer } : {}),
+      collaborators: [alice, bob],
+      admins: ['alice'],
+    })
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    await renderWithSession(<TimerBar />, adapter, queryClient)
+    fireEvent.click(screen.getByRole('button', { name: 'Manual' }))
+    await waitFor(() => expect(queryClient.isFetching()).toBe(0))
+    return { adapter }
+  }
+
+  async function addFor(login: string, start: string, end: string) {
+    fireEvent.change(screen.getByLabelText('Start'), { target: { value: start } })
+    fireEvent.change(screen.getByLabelText('End'), { target: { value: end } })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: `Add entry for ${login}` }))
+    })
+  }
+
+  it('shows no member picker to workers', async () => {
+    await setupAs(bob)
+    expect(screen.queryByLabelText('For')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Add entry' })).toBeInTheDocument()
+  })
+
+  it('adds an entry for the chosen member and keeps the choice for the next one', async () => {
+    const { adapter } = await setupAs(alice)
+    await waitFor(() => expect(picker()).toBeInTheDocument())
+    fireEvent.change(picker(), { target: { value: 'bob' } })
+    fireEvent.change(desc(), { target: { value: 'Client call' } })
+    await addFor('bob', '09:00', '11:30')
+    expect(await screen.findByText('Entry added for bob.')).toBeInTheDocument()
+    const [entry] = await adapter.listAllEntries()
+    expect(entry).toMatchObject({ login: 'bob', addedBy: 'alice', description: 'Client call' })
+    expect(picker().value).toBe('bob')
+    expect(desc().value).toBe('')
+  })
+
+  it("leaves the user's own running timer alone", async () => {
+    vi.useFakeTimers({ now: at(10, 40), toFake: ['Date'] })
+    const timer: RunningTimer = {
+      id: 't1',
+      login: 'alice',
+      start: at(9).toISOString(),
+      description: 'Design review',
+      projectId: null,
+      tagIds: [],
+    }
+    const { adapter } = await setupAs(alice, timer)
+    await waitFor(() => expect(desc().value).toBe('Design review'))
+    fireEvent.change(picker(), { target: { value: 'bob' } })
+    expect(desc().value).toBe('')
+    expect((screen.getByLabelText('Start') as HTMLInputElement).value).toBe('')
+    await addFor('bob', '08:00', '09:00')
+    await screen.findByText('Entry added for bob.')
+    expect((await adapter.listAllEntries())[0]).toMatchObject({ login: 'bob' })
+    expect(await adapter.getTimer()).toEqual(timer)
+
+    fireEvent.change(picker(), { target: { value: 'alice' } })
+    await waitFor(() => expect(desc().value).toBe('Design review'))
+    expect(screen.getByRole('button', { name: 'Stop & save' })).toBeInTheDocument()
   })
 })
 

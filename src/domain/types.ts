@@ -13,6 +13,8 @@ export interface TimeEntry {
   updatedAt: IsoString
   /** Login of the member who stopped the timer that created this entry, if not its owner. */
   stoppedBy?: string
+  /** Login of the member who added this entry for its owner, if not the owner. Set by the storage layer. */
+  addedBy?: string
 }
 
 export interface RunningTimer {

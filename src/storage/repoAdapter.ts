@@ -304,9 +304,11 @@ export class RepoAdapter implements StorageAdapter {
     if (durationMs(entry.start, entry.end) <= 0) {
       throw new StorageError('invalid', 'Entry must end after it starts')
     }
-    const saved: TimeEntry = { ...entry, updatedAt: new Date().toISOString() }
-    const path = PATHS.entries(saved.login, monthKey(saved.start))
     const isUpdate = previousStart !== undefined
+    const addedBy = await this.entryAdder(entry, previousStart)
+    const saved: TimeEntry = { ...entry, addedBy, updatedAt: new Date().toISOString() }
+    if (!addedBy) delete saved.addedBy
+    const path = PATHS.entries(saved.login, monthKey(saved.start))
     const verb = isUpdate ? 'update' : 'add'
     await this.writeFile(
       path,
@@ -334,6 +336,22 @@ export class RepoAdapter implements StorageAdapter {
       (cur) => (cur ?? []).filter((e) => e.id !== entry.id),
       `entry: delete ${quote(entry.description)}${actor}`,
     )
+  }
+
+  /**
+   * Who added the entry for its owner: the current user when creating another member's entry,
+   * otherwise whatever the stored copy says (clients cannot set or change it).
+   */
+  private async entryAdder(entry: TimeEntry, previousStart?: string): Promise<string | undefined> {
+    if (previousStart === undefined) {
+      const me = await this.getCurrentUser()
+      return entry.login === me.login ? undefined : me.login
+    }
+    const stored = await this.readFile(
+      PATHS.entries(entry.login, monthKey(previousStart)),
+      entriesCodec,
+    )
+    return stored?.find((e) => e.id === entry.id)?.addedBy
   }
 
   /**
