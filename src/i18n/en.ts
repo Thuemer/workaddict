@@ -571,6 +571,8 @@ const en = {
     useDuration: 'Enter duration instead',
     useEnd: 'Enter end time instead',
     add: 'Add entry',
+    stopAndSave: 'Stop & save',
+    runningHint: 'This is your running timer. Saving stops it with these times.',
     preview: 'Duration: {{duration}}',
     nextDay: 'ends the next day',
     errors: {

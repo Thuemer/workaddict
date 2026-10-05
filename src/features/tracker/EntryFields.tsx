@@ -1,4 +1,4 @@
-import { format } from '../../domain/zoned'
+import { format, isSameDay } from '../../domain/zoned'
 import { ProjectPicker, TagPicker } from '../../components/Pickers'
 import { TimeInput } from '../../components/TimeInput'
 import {
@@ -83,6 +83,30 @@ export function timeFieldsFrom(start: Date, end: Date, f: TimeFormat): TimeField
     duration: formatHM(durationMs(start, end)),
     useDuration: false,
   }
+}
+
+/** Whether the user edited the times shown from `initial` (only the active end-or-duration counts). */
+export function timesChanged(times: TimeFields, initial: TimeFields): boolean {
+  return (
+    times.date !== initial.date ||
+    times.startTime !== initial.startTime ||
+    (times.useDuration ? times.duration !== initial.duration : times.endTime !== initial.endTime)
+  )
+}
+
+/**
+ * The times to save: exact `start`/`end` (second precision) unless the user edited the fields
+ * (minute-rounded fields could otherwise turn a sub-minute span into 0 h or 24 h).
+ */
+export function resolveEditedTimes(
+  times: TimeFields,
+  initial: TimeFields,
+  start: Date,
+  end: Date,
+): ManualTimeResult {
+  return timesChanged(times, initial)
+    ? resolveTimeFields(times)
+    : { ok: true, start, end, overnight: !isSameDay(start, end) }
 }
 
 export function resolveTimeFields(f: TimeFields): ManualTimeResult {

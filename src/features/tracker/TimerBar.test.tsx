@@ -105,6 +105,149 @@ describe('starting a timer', () => {
   })
 })
 
+describe('switching between timer and manual mode', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    localStorage.clear()
+  })
+
+  const desc = () => screen.getByLabelText('What are you working on?') as HTMLInputElement
+  const tab = (name: 'Timer' | 'Manual') => fireEvent.click(screen.getByRole('button', { name }))
+
+  async function setupIdle() {
+    const adapter = createMemoryAdapter(alice, {
+      store: new MemoryFileStore(),
+      collaborators: [alice],
+      admins: ['alice'],
+    })
+    await renderWithSession(<TimerBar />, adapter)
+    return { adapter }
+  }
+
+  async function switchToManual() {
+    tab('Manual')
+    await waitFor(() => expect(desc().value).toBe('Design review'))
+  }
+
+  async function stopAndSave() {
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Stop & save' }))
+    })
+  }
+
+  it('keeps the description from timer to manual and back, but not manual times', async () => {
+    localStorage.clear()
+    await setupIdle()
+    fireEvent.change(desc(), { target: { value: 'Review' } })
+    tab('Manual')
+    expect(desc().value).toBe('Review')
+    fireEvent.change(screen.getByLabelText('Start'), { target: { value: '13:00' } })
+    tab('Timer')
+    expect(desc().value).toBe('Review')
+    tab('Manual')
+    expect((screen.getByLabelText('Start') as HTMLInputElement).value).toBe('')
+  })
+
+  it('clears the draft after starting the timer', async () => {
+    localStorage.clear()
+    const { adapter } = await setupIdle()
+    fireEvent.change(desc(), { target: { value: 'Review' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }))
+    await waitFor(async () => expect((await adapter.getTimer())?.description).toBe('Review'))
+    const stop = await screen.findByRole('button', { name: 'Stop' })
+    await waitFor(() => expect(stop).not.toBeDisabled())
+    fireEvent.click(stop)
+    await screen.findByRole('button', { name: 'Start' })
+    expect(desc().value).toBe('')
+    tab('Manual')
+    expect(desc().value).toBe('')
+  })
+
+  it('clears the draft after adding a manual entry', async () => {
+    localStorage.clear()
+    const { adapter } = await setupIdle()
+    tab('Manual')
+    fireEvent.change(desc(), { target: { value: 'Review' } })
+    fireEvent.change(screen.getByLabelText('Start'), { target: { value: '13:00' } })
+    fireEvent.change(screen.getByLabelText('End'), { target: { value: '14:00' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add entry' }))
+    await waitFor(() => expect(desc().value).toBe(''))
+    expect(await adapter.listAllEntries()).toHaveLength(1)
+    tab('Timer')
+    expect(desc().value).toBe('')
+  })
+
+  it('stops a running timer with corrected times', async () => {
+    vi.useFakeTimers({ now: at(10, 40), toFake: ['Date'] })
+    const { adapter } = await setup(at(9))
+    await switchToManual()
+    expect((screen.getByLabelText('Start') as HTMLInputElement).value).toBe('09:00')
+    expect((screen.getByLabelText('End') as HTMLInputElement).value).toBe('10:40')
+    fireEvent.change(screen.getByLabelText('Start'), { target: { value: '08:50' } })
+    fireEvent.change(screen.getByLabelText('End'), { target: { value: '10:30' } })
+    await stopAndSave()
+    await waitFor(async () => expect(await adapter.getTimer()).toBeNull())
+    const entries = await adapter.listAllEntries()
+    expect(entries).toHaveLength(1)
+    expect(entries[0]).toMatchObject({
+      description: 'Design review',
+      start: at(8, 50).toISOString(),
+      end: at(10, 30).toISOString(),
+    })
+  })
+
+  it('ends the entry when manual mode was opened', async () => {
+    vi.useFakeTimers({ now: at(10, 40), toFake: ['Date'] })
+    const { adapter } = await setup(at(9))
+    await switchToManual()
+    vi.setSystemTime(at(10, 45))
+    await stopAndSave()
+    await waitFor(async () => expect(await adapter.getTimer()).toBeNull())
+    const [entry] = await adapter.listAllEntries()
+    expect(entry).toMatchObject({ start: at(9).toISOString(), end: at(10, 40).toISOString() })
+  })
+
+  it('keeps the timer running with edited fields when leaving manual mode', async () => {
+    vi.useFakeTimers({ now: at(10, 40), toFake: ['Date'] })
+    const { adapter } = await setup(at(9))
+    await switchToManual()
+    fireEvent.change(desc(), { target: { value: 'Planning' } })
+    fireEvent.change(screen.getByLabelText('Start'), { target: { value: '08:00' } })
+    tab('Timer')
+    await waitFor(async () => expect((await adapter.getTimer())?.description).toBe('Planning'))
+    expect((await adapter.getTimer())?.start).toBe(at(9).toISOString())
+    expect(await adapter.listAllEntries()).toHaveLength(0)
+  })
+
+  it('refuses invalid times and leaves the timer unchanged', async () => {
+    vi.useFakeTimers({ now: at(10, 40), toFake: ['Date'] })
+    const { adapter } = await setup(at(9))
+    await switchToManual()
+    fireEvent.click(screen.getByRole('button', { name: 'Enter duration instead' }))
+    fireEvent.change(screen.getByLabelText('Duration'), { target: { value: '25:00' } })
+    await stopAndSave()
+    expect(
+      screen.getByText('The duration must be more than 0 and at most 24 hours.'),
+    ).toBeInTheDocument()
+    expect((await adapter.getTimer())?.start).toBe(at(9).toISOString())
+    expect(await adapter.listAllEntries()).toHaveLength(0)
+  })
+
+  it('saves nothing when the timer was stopped elsewhere', async () => {
+    vi.useFakeTimers({ now: at(10, 40), toFake: ['Date'] })
+    const { adapter } = await setup(at(9))
+    await switchToManual()
+    await adapter.stopTimer(at(10))
+    await stopAndSave()
+    expect(
+      await screen.findByText('This timer was already stopped on another device.'),
+    ).toBeInTheDocument()
+    const entries = await adapter.listAllEntries()
+    expect(entries).toHaveLength(1)
+    expect(entries[0]?.end).toBe(at(10).toISOString())
+  })
+})
+
 describe('remembered choices', () => {
   afterEach(() => localStorage.clear())
 

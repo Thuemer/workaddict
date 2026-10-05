@@ -12,8 +12,10 @@ import { useDiscardTimer, useSaveEntry, useUpdateTimer } from '../data/hooks'
 import { useErrorText, useErrorToast } from '../data/useErrorText'
 import {
   GroupPickers,
+  resolveEditedTimes,
   resolveTimeFields,
   TimeInputs,
+  timeFieldsFrom,
   type TimeFields,
   type WorkFields,
 } from './EntryFields'
@@ -152,10 +154,15 @@ function RunningTimerView({ timer }: { timer: RunningTimer }) {
   )
 }
 
-function StartTimerView() {
+interface DraftProps {
+  /** Description, project and tags shared by the timer and manual forms. */
+  draft: WorkFields
+  setDraft: (draft: WorkFields) => void
+}
+
+function StartTimerView({ draft, setDraft }: DraftProps) {
   const { t } = useI18n()
   const { startTimer, busy } = useTimerActions()
-  const [draft, setDraft] = useState<WorkFields>(EMPTY)
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -195,22 +202,72 @@ function defaultTimes(): TimeFields {
   }
 }
 
-function ManualEntryView() {
-  const { t } = useI18n()
+/**
+ * Manual entry form. With a running timer it shows that timer, ending when the form opened,
+ * and saving stops the timer with the edited values.
+ */
+function ManualEntryView({
+  draft: fields,
+  setDraft: setFields,
+  timer,
+}: DraftProps & { timer: RunningTimer | null }) {
+  const { t, timeFormat } = useI18n()
   const toast = useToast()
   const onError = useErrorToast()
   const { user } = useSessionData()
   const save = useSaveEntry()
-  const [fields, setFields] = useState<WorkFields>(EMPTY)
-  const [times, setTimes] = useState<TimeFields>(defaultTimes)
+  const update = useUpdateTimer()
+  const { stopTimerAt, busy } = useTimerActions()
+  // The running timer's span as of opening the form; the end stays fixed while editing.
+  const [span] = useState(() => timer && { start: new Date(timer.start), end: new Date() })
+  const [initialTimes] = useState(() =>
+    span ? timeFieldsFrom(span.start, span.end, timeFormat) : null,
+  )
+  const [times, setTimes] = useState<TimeFields>(() => initialTimes ?? defaultTimes())
   const [timeInput, setTimeInput] = usePref('manualTimeInput')
   const [showErrors, setShowErrors] = useState(false)
+  const [finishing, setFinishing] = useState(false)
+  const shownTimes = { ...times, useDuration: timeInput === 'duration' }
+  const resolved =
+    span && initialTimes
+      ? resolveEditedTimes(
+          shownTimes,
+          { ...initialTimes, useDuration: shownTimes.useDuration },
+          span.start,
+          span.end,
+        )
+      : resolveTimeFields(shownTimes)
+
+  const finishTimer = async (start: Date, end: Date) => {
+    setFinishing(true)
+    try {
+      // Apply the edits first so the stop writes them; null means the timer is gone.
+      const updated = await update.mutateAsync({
+        ...fields,
+        description: fields.description.trim(),
+        start: start.toISOString(),
+      })
+      if (!updated) {
+        toast.info(t('timer.alreadyStopped'))
+        return
+      }
+      stopTimerAt(end)
+    } catch (e) {
+      onError(e)
+    } finally {
+      setFinishing(false)
+    }
+  }
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    const r = resolveTimeFields({ ...times, useDuration: timeInput === 'duration' })
+    const r = resolved
     if (!r.ok) {
       setShowErrors(true)
+      return
+    }
+    if (timer) {
+      void finishTimer(r.start, r.end)
       return
     }
     const now = new Date().toISOString()
@@ -255,46 +312,121 @@ function ManualEntryView() {
         </div>
       </div>
       <TimeInputs
-        value={{ ...times, useDuration: timeInput === 'duration' }}
+        value={shownTimes}
         onChange={({ useDuration, ...p }) => {
           if (useDuration !== undefined) setTimeInput(useDuration ? 'duration' : 'end')
           setTimes({ ...times, ...p })
         }}
         showErrors={showErrors}
+        resolved={resolved}
       />
       <div className="row" style={{ justifyContent: 'flex-end' }}>
-        <button className="btn btn-primary" disabled={save.isPending}>
-          <Icon name="plus" size={16} />
-          {t('manual.add')}
-        </button>
+        {timer ? (
+          <>
+            <span className="small muted">{t('manual.runningHint')}</span>
+            <button
+              className="btn btn-danger"
+              disabled={finishing || busy || timer.id === 'pending'}
+            >
+              <Icon name="stop" size={16} filled />
+              {t('manual.stopAndSave')}
+            </button>
+          </>
+        ) : (
+          <button className="btn btn-primary" disabled={save.isPending}>
+            <Icon name="plus" size={16} />
+            {t('manual.add')}
+          </button>
+        )}
       </div>
     </form>
   )
 }
 
+function workFieldsOf(timer: RunningTimer): WorkFields {
+  return { description: timer.description, projectId: timer.projectId, tagIds: timer.tagIds }
+}
+
+const sameValue = (a: WorkFields[keyof WorkFields], b: WorkFields[keyof WorkFields]) =>
+  Array.isArray(a) && Array.isArray(b) ? a.join('\n') === b.join('\n') : a === b
+
+/** The fields of `next` that differ from `base`, or null if none do. */
+function changedFields(base: WorkFields, next: WorkFields): Partial<WorkFields> | null {
+  const keys = (Object.keys(next) as (keyof WorkFields)[]).filter(
+    (k) => !sameValue(base[k], next[k]),
+  )
+  return keys.length ? Object.fromEntries(keys.map((k) => [k, next[k]])) : null
+}
+
 export function TimerBar() {
   const { t } = useI18n()
   const { timer } = useTimerActions()
+  const onError = useErrorToast()
+  const update = useUpdateTimer()
   const [mode, setMode] = usePref('entryMode')
+  const [draft, setDraft] = useState<WorkFields>(EMPTY)
+  // The running timer the manual form was filled from, and its values at that point.
+  const [seed, setSeed] = useState<{ id: string; fields: WorkFields } | null>(null)
+
+  if (mode === 'manual' && timer) {
+    const remote = workFieldsOf(timer)
+    if (seed?.id !== timer.id) {
+      setSeed({ id: timer.id, fields: remote })
+      setDraft(remote)
+    } else if (changedFields(seed.fields, remote)) {
+      // Follow changes from elsewhere (e.g. a description saved on blur) unless edited here.
+      setSeed({ id: timer.id, fields: remote })
+      const keep = changedFields(seed.fields, draft) ?? {}
+      setDraft({ ...remote, ...keep })
+    }
+  } else if (mode === 'manual' && seed && !timer) {
+    // Stopped here or elsewhere: its values belong to the saved entry now.
+    setSeed(null)
+    setDraft(EMPTY)
+  }
+
+  const switchTo = (next: 'timer' | 'manual') => {
+    if (next === mode) return
+    if (next === 'timer' && timer && seed?.id === timer.id) {
+      // Keep the running timer, with the description, project and tags edited here.
+      const patch = changedFields(workFieldsOf(timer), {
+        ...draft,
+        description: draft.description.trim(),
+      })
+      if (patch && timer.id !== 'pending') update.mutate(patch, { onError })
+      setDraft(EMPTY)
+    }
+    setSeed(null)
+    setMode(next)
+  }
 
   return (
     <section className="card timer-bar">
       <div className="row">
         <div className="segmented" role="group">
-          <button type="button" aria-pressed={mode === 'timer'} onClick={() => setMode('timer')}>
+          <button type="button" aria-pressed={mode === 'timer'} onClick={() => switchTo('timer')}>
             {t('timer.modeTimer')}
           </button>
-          <button type="button" aria-pressed={mode === 'manual'} onClick={() => setMode('manual')}>
+          <button
+            type="button"
+            aria-pressed={mode === 'manual'}
+            onClick={() => switchTo('manual')}
+          >
             {t('timer.modeManual')}
           </button>
         </div>
       </div>
       {mode === 'manual' ? (
-        <ManualEntryView />
+        <ManualEntryView
+          key={timer?.id ?? 'none'}
+          draft={draft}
+          setDraft={setDraft}
+          timer={timer}
+        />
       ) : timer ? (
         <RunningTimerView key={timer.id} timer={timer} />
       ) : (
-        <StartTimerView />
+        <StartTimerView draft={draft} setDraft={setDraft} />
       )}
     </section>
   )

@@ -594,6 +594,8 @@ const de: Resources = {
     useDuration: 'Stattdessen Dauer eingeben',
     useEnd: 'Stattdessen Endzeit eingeben',
     add: 'Eintrag hinzufügen',
+    stopAndSave: 'Stoppen & speichern',
+    runningHint: 'Das ist dein laufender Timer. Beim Speichern wird er mit diesen Zeiten gestoppt.',
     preview: 'Dauer: {{duration}}',
     nextDay: 'endet am nächsten Tag',
     errors: {

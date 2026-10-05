@@ -1,6 +1,4 @@
-import { isSameDay } from '../../domain/zoned'
 import { useRef, useState, type FormEvent } from 'react'
-import type { ManualTimeResult } from '../../domain/time'
 import { Modal } from '../../components/Modal'
 import type { TimeEntry } from '../../domain/types'
 import { useI18n } from '../../i18n'
@@ -10,9 +8,10 @@ import { useErrorToast } from '../data/useErrorText'
 import { readPref, writePref } from '../../prefs'
 import {
   GroupPickers,
-  resolveTimeFields,
+  resolveEditedTimes,
   TimeInputs,
   timeFieldsFrom,
+  timesChanged,
   type TimeFields,
   type WorkFields,
 } from './EntryFields'
@@ -62,22 +61,13 @@ export function EntryEditModal({
   })
   const submitted = useRef<EntryDraft | null>(null)
 
-  const timesChanged =
-    times.date !== initialTimes.date ||
-    times.startTime !== initialTimes.startTime ||
-    (times.useDuration
-      ? times.duration !== initialTimes.duration
-      : times.endTime !== initialTimes.endTime)
-  // Keep second precision of timer entries unless the times were actually edited
-  // (minute-rounded fields could otherwise turn a sub-minute entry into 0 h or 24 h).
-  const resolved: ManualTimeResult = timesChanged
-    ? resolveTimeFields(times)
-    : {
-        ok: true,
-        start: new Date(entry.start),
-        end: new Date(entry.end),
-        overnight: !isSameDay(new Date(entry.start), new Date(entry.end)),
-      }
+  // Keep second precision of timer entries unless the times were actually edited.
+  const resolved = resolveEditedTimes(
+    times,
+    initialTimes,
+    new Date(entry.start),
+    new Date(entry.end),
+  )
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -85,8 +75,9 @@ export function EntryEditModal({
       setShowErrors(true)
       return
     }
-    const start = timesChanged ? resolved.start.toISOString() : entry.start
-    const end = timesChanged ? resolved.end.toISOString() : entry.end
+    const edited = timesChanged(times, initialTimes)
+    const start = edited ? resolved.start.toISOString() : entry.start
+    const end = edited ? resolved.end.toISOString() : entry.end
     submitted.current = { fields, times }
     // The list shows the new values at once (optimistic update), so there is nothing to wait for.
     save.mutate({
