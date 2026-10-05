@@ -20,18 +20,31 @@ export const NO_TAG = '__none__'
 
 // ---- ranges ------------------------------------------------------------------
 
-export type RangePreset = 'today' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' | 'thisYear'
+export type RangePreset =
+  | 'today'
+  | 'thisWeek'
+  | 'lastWeek'
+  | 'lastTwoWeeks'
+  | 'thisMonth'
+  | 'lastMonth'
+  | 'thisYear'
+  | 'allTime'
 export const RANGE_PRESETS: RangePreset[] = [
   'today',
   'thisWeek',
   'lastWeek',
+  'lastTwoWeeks',
   'thisMonth',
   'lastMonth',
   'thisYear',
+  'allTime',
 ]
 
+/** Presets whose range depends only on the date; 'allTime' depends on the entries (see allTimeRange). */
+export type DatePreset = Exclude<RangePreset, 'allTime'>
+
 /** Range for a preset in the effective time zone; weeks start on Monday. */
-export function presetRange(preset: RangePreset, now = new Date()): DateRange {
+export function presetRange(preset: DatePreset, now = new Date()): DateRange {
   switch (preset) {
     case 'today':
       return { from: startOfDay(now), to: endOfDay(now) }
@@ -41,6 +54,8 @@ export function presetRange(preset: RangePreset, now = new Date()): DateRange {
       const d = addWeeks(now, -1)
       return { from: startOfWeek(d), to: endOfWeek(d) }
     }
+    case 'lastTwoWeeks':
+      return { from: startOfWeek(addWeeks(now, -1)), to: endOfWeek(now) }
     case 'thisMonth':
       return { from: startOfMonth(now), to: endOfMonth(now) }
     case 'lastMonth': {
@@ -50,6 +65,13 @@ export function presetRange(preset: RangePreset, now = new Date()): DateRange {
     case 'thisYear':
       return { from: startOfYear(now), to: endOfYear(now) }
   }
+}
+
+/** From the day of the earliest entry through the end of today; just today without entries. */
+export function allTimeRange(entries: TimeEntry[], now = new Date()): DateRange {
+  let first = now.getTime()
+  for (const e of entries) first = Math.min(first, new Date(e.start).getTime())
+  return { from: startOfDay(first), to: endOfDay(now) }
 }
 
 // ---- filtering ---------------------------------------------------------------
@@ -171,11 +193,12 @@ export function byTag(entries: TimeEntry[], ws: Workspace, noTagLabel: string) {
 
 // ---- time buckets ------------------------------------------------------------
 
-export type Granularity = 'day' | 'week'
+export type Granularity = 'day' | 'week' | 'month'
 
-/** Daily bars up to 62 days, weekly bars beyond. */
+/** Daily bars up to 62 days, weekly bars up to 366 days, monthly bars beyond. */
 export function granularityFor(range: DateRange): Granularity {
-  return differenceInCalendarDays(range.to, range.from) + 1 > 62 ? 'week' : 'day'
+  const days = differenceInCalendarDays(range.to, range.from) + 1
+  return days > 366 ? 'month' : days > 62 ? 'week' : 'day'
 }
 
 export interface Bucket {
@@ -191,8 +214,9 @@ export function timeBuckets(
   ws: Workspace,
   granularity: Granularity = granularityFor(range),
 ): Bucket[] {
-  const bucketStart = (d: Date) => (granularity === 'day' ? startOfDay(d) : startOfWeek(d))
-  const step = (d: Date) => (granularity === 'day' ? addDays(d, 1) : addWeeks(d, 1))
+  const bucketStart = { day: startOfDay, week: startOfWeek, month: startOfMonth }[granularity]
+  const step = (d: Date) =>
+    granularity === 'day' ? addDays(d, 1) : granularity === 'week' ? addWeeks(d, 1) : addMonths(d, 1)
   const buckets = new Map<number, Bucket>()
   for (let d = bucketStart(range.from); d <= range.to; d = step(d)) {
     buckets.set(d.getTime(), { start: d, totalMs: 0, byProject: {} })

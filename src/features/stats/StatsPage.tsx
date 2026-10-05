@@ -7,18 +7,18 @@ import { durationMs, formatHM } from '../../domain/time'
 import { EMPTY_WORKSPACE, type DateRange, type TimeEntry } from '../../domain/types'
 import { useI18n } from '../../i18n'
 import { getTimeFormat } from '../../timeFormat'
-import { useEntries, useLookups } from '../data/hooks'
+import { useAllEntries, useEntries, useLookups } from '../data/hooks'
 import { loadWriter, type ExportFormat } from '../export/formats'
 import { buildReport, chartToPng } from '../export/report'
 import { HoursBarChart, ProjectShareChart } from './Charts'
 import { ExportMenu } from './ExportMenu'
 import {
+  allTimeRange,
   byMember,
   byProject,
   byTag,
   filterEntries,
   granularityFor,
-  NO_FILTERS,
   NO_PROJECT,
   NO_TAG,
   presetRange,
@@ -29,6 +29,7 @@ import {
   type RangePreset,
   type StatsFilters,
 } from './stats'
+import { pruneFilters, useStatsState } from './statsState'
 
 function BreakdownTable({ title, rows, note }: { title: string; rows: BreakdownRow[]; note?: string }) {
   const { t } = useI18n()
@@ -184,17 +185,18 @@ export default function StatsPage() {
   const toast = useToast()
   const lookups = useLookups()
   const ws = lookups.workspace ?? EMPTY_WORKSPACE
-  const [preset, setPreset] = useState<RangePreset | 'custom'>('thisWeek')
-  const [custom, setCustom] = useState(() => {
-    const r = presetRange('thisMonth')
-    return { from: format(r.from, 'yyyy-MM-dd'), to: format(r.to, 'yyyy-MM-dd') }
-  })
-  const [filters, setFilters] = useState<StatsFilters>(NO_FILTERS)
+  const [state, setState] = useStatsState()
+  const { preset, custom } = state
+  const setPreset = (preset: RangePreset | 'custom') => setState((s) => ({ ...s, preset }))
+  const setCustom = (custom: { from: string; to: string }) => setState((s) => ({ ...s, custom }))
+  const setFilters = (filters: StatsFilters) => setState((s) => ({ ...s, filters }))
   const [exporting, setExporting] = useState<ExportFormat | null>(null)
   const barRef = useRef<HTMLDivElement>(null)
   const shareRef = useRef<HTMLDivElement>(null)
 
-  const range: DateRange = useMemo(() => {
+  const allTime = preset === 'allTime'
+  const datedRange: DateRange = useMemo(() => {
+    if (preset === 'allTime') return presetRange('thisWeek') // unused: all time loads every entry
     if (preset !== 'custom') return presetRange(preset)
     const from = fromDateKey(custom.from)
     const toDay = fromDateKey(custom.to)
@@ -202,17 +204,18 @@ export default function StatsPage() {
     return !from || !to || to < from ? presetRange('thisMonth') : { from, to }
   }, [preset, custom])
 
-  const query = useEntries(range)
-  const filtered = useMemo(
-    () => filterEntries(query.data ?? [], filters, ws),
-    [query.data, filters, ws],
+  const datedQuery = useEntries(datedRange, { enabled: !allTime })
+  const allQuery = useAllEntries({ enabled: allTime })
+  const query = allTime ? allQuery : datedQuery
+  const range = useMemo(
+    () => (allTime ? allTimeRange(allQuery.data ?? []) : datedRange),
+    [allTime, allQuery.data, datedRange],
   )
-  const summary = useMemo(() => summarize(filtered), [filtered])
-  const projectRows = useMemo(() => byProject(filtered, ws, t('common.noProject')), [filtered, ws, t])
-  const memberRows = useMemo(() => byMember(filtered), [filtered])
-  const tagRows = useMemo(() => byTag(filtered, ws, t('common.noTag')), [filtered, ws, t])
-  const granularity = granularityFor(range)
-  const buckets = useMemo(() => timeBuckets(filtered, range, ws, granularity), [filtered, range, ws, granularity])
+  const entries = useMemo(() => {
+    if (!allTime) return datedQuery.data ?? []
+    const to = range.to.getTime()
+    return (allQuery.data ?? []).filter((e) => new Date(e.start).getTime() <= to)
+  }, [allTime, datedQuery.data, allQuery.data, range])
 
   const memberOptions = lookups.members.map((m) => ({ id: m.login, label: m.login }))
   const projectOptions = [
@@ -223,6 +226,28 @@ export default function StatsPage() {
     ...ws.tags.map((x) => ({ id: x.id, label: x.name })),
     { id: NO_TAG, label: t('common.noTag') },
   ]
+
+  // Remembered ids of deleted members, projects or tags are dropped once the workspace has loaded.
+  const loaded = lookups.workspace !== undefined && lookups.members.length > 0
+  const filters = useMemo(
+    () =>
+      loaded
+        ? pruneFilters(state.filters, {
+            members: lookups.members.map((m) => m.login),
+            projects: [...ws.projects.map((p) => p.id), NO_PROJECT],
+            tags: [...ws.tags.map((x) => x.id), NO_TAG],
+          })
+        : state.filters,
+    [loaded, state.filters, lookups.members, ws],
+  )
+
+  const filtered = useMemo(() => filterEntries(entries, filters, ws), [entries, filters, ws])
+  const summary = useMemo(() => summarize(filtered), [filtered])
+  const projectRows = useMemo(() => byProject(filtered, ws, t('common.noProject')), [filtered, ws, t])
+  const memberRows = useMemo(() => byMember(filtered), [filtered])
+  const tagRows = useMemo(() => byTag(filtered, ws, t('common.noTag')), [filtered, ws, t])
+  const granularity = granularityFor(range)
+  const buckets = useMemo(() => timeBuckets(filtered, range, ws, granularity), [filtered, range, ws, granularity])
 
   const filtersText = () => {
     const part = (label: string, value: string[] | null, opts: { id: string; label: string }[]) =>

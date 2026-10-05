@@ -29,15 +29,19 @@ export const HoursBarChart = forwardRef<
     () =>
       buckets.map((b) => ({
         label:
-          granularity === 'week'
-            ? format(b.start, 'd MMM', { locale })
-            : buckets.length <= 14
-              ? format(b.start, 'EEE d', { locale })
-              : format(b.start, 'd.M.', { locale }),
+          granularity === 'month'
+            ? format(b.start, 'MMM yy', { locale })
+            : granularity === 'week'
+              ? format(b.start, 'd MMM', { locale })
+              : buckets.length <= 14
+                ? format(b.start, 'EEE d', { locale })
+                : format(b.start, 'd.M.', { locale }),
         title:
-          granularity === 'week'
-            ? t('stats.week', { date: format(b.start, 'PP', { locale }) })
-            : format(b.start, 'EEEE, PP', { locale }),
+          granularity === 'month'
+            ? format(b.start, 'MMMM yyyy', { locale })
+            : granularity === 'week'
+              ? t('stats.week', { date: format(b.start, 'PP', { locale }) })
+              : format(b.start, 'EEEE, PP', { locale }),
         ...Object.fromEntries(Object.entries(b.byProject).map(([k, ms]) => [k, ms / HOUR])),
       })),
     [buckets, granularity, locale, t],

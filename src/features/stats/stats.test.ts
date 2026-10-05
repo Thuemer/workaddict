@@ -1,5 +1,6 @@
 import type { TimeEntry, Workspace } from '../../domain/types'
 import {
+  allTimeRange,
   byMember,
   byProject,
   byTag,
@@ -61,6 +62,25 @@ describe('presetRange', () => {
     expect(r.from).toEqual(new Date(2026, 8, 21))
     expect(presetRange('lastWeek', now).from).toEqual(new Date(2026, 8, 14))
   })
+  it('last 2 weeks covers last week and this week', () => {
+    const r = presetRange('lastTwoWeeks', new Date(2026, 9, 5, 10, 0)) // Monday 2026-10-05
+    expect(r.from).toEqual(new Date(2026, 8, 28))
+    expect(r.to).toEqual(new Date(2026, 9, 11, 23, 59, 59, 999))
+  })
+})
+
+describe('allTimeRange', () => {
+  const now = new Date(2026, 9, 5, 10, 0)
+  it('starts on the day of the earliest entry and ends today', () => {
+    const r = allTimeRange(entries, now)
+    expect(r.from).toEqual(new Date(2026, 8, 1))
+    expect(r.to).toEqual(new Date(2026, 9, 5, 23, 59, 59, 999))
+  })
+  it('covers only today without entries', () => {
+    const r = allTimeRange([], now)
+    expect(r.from).toEqual(new Date(2026, 9, 5))
+    expect(r.to).toEqual(new Date(2026, 9, 5, 23, 59, 59, 999))
+  })
 })
 
 describe('filterEntries', () => {
@@ -120,6 +140,20 @@ describe('time buckets', () => {
   it('uses days up to 62 days and weeks beyond', () => {
     expect(granularityFor({ from: new Date(2026, 0, 1), to: new Date(2026, 2, 3) })).toBe('day')
     expect(granularityFor({ from: new Date(2026, 0, 1), to: new Date(2026, 2, 4) })).toBe('week')
+  })
+
+  it('uses weeks up to 366 days and months beyond', () => {
+    expect(granularityFor({ from: new Date(2024, 0, 1), to: new Date(2024, 11, 31) })).toBe('week') // leap year
+    expect(granularityFor({ from: new Date(2025, 0, 1), to: new Date(2026, 0, 2) })).toBe('month')
+  })
+
+  it('groups monthly buckets across a year boundary', () => {
+    const range = { from: new Date(2025, 10, 15), to: new Date(2026, 8, 30, 23, 59) }
+    const b = timeBuckets(entries, range, ws, 'month')
+    expect(b).toHaveLength(11) // Nov 2025 .. Sep 2026
+    expect(b[0]!.start).toEqual(new Date(2025, 10, 1))
+    expect(b[2]!.start).toEqual(new Date(2026, 0, 1))
+    expect(b[10]!.totalMs).toBe(10 * H)
   })
 
   it('creates one bucket per day including empty days, stacked by project', () => {

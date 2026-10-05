@@ -54,11 +54,12 @@ export function useMembers() {
   })
 }
 
-export function useEntries(range: DateRange) {
+export function useEntries(range: DateRange, { enabled = true }: { enabled?: boolean } = {}) {
   const { adapter } = useSessionData()
   return useQuery({
     queryKey: keys.entriesRange(range),
     queryFn: () => adapter.listEntries(range),
+    enabled,
     placeholderData: (prev) => prev,
     // Pick up entries created on other devices (e.g. a timer stopped elsewhere). Cheap: one head
     // request when nothing changed; unchanged files are served from the blob-SHA cache.
