@@ -541,13 +541,11 @@ textarea {
 }
 .timer-main .desc-input {
   flex: 1 1 260px;
-  border-color: transparent;
   background: transparent;
   font-size: 1rem;
-  padding-left: 4px;
 }
 .timer-main .desc-input:hover {
-  border-color: var(--border);
+  border-color: var(--text-faint);
 }
 .timer-main .desc-input:focus {
   border-color: var(--accent);
